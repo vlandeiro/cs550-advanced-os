@@ -1,0 +1,7 @@
+{
+    "listening_ip": "localhost",
+    "listening_port": 5000,
+    "idxserv_ip": "localhost",
+    "idxserv_port": 4001,
+    "dir_path": "./files/"
+}
