@@ -28,36 +28,40 @@ class IndexingServer:
         self.files_dict = self.manager.dict()
         self.listening_socket = None
 
-    def message_handler(self, conn):
-        client_so, client_addr = conn
-        logger.debug("Accepted connection from %s" % client_addr)
-        client_so.send('Hi you!')
-        msg = ''
+    def message_handler(self, client_so, client_addr):
+        logger.debug("Accepted connection from %s", client_addr)
+        pickled_msg = ''
         while True:
             shard = client_so.recv(BUFFER_SIZE)
-            if not shard:
-                break
+            logger.debug("shard: " + shard)
+            if shard:
+                pickled_msg += shard
             else:
-                msg += shard
-        print msg
+                break
+        logger.debug("pickle: " + pickled_msg)
         client_so.close()
 
     def run(self):
-        socket_server = socket(AF_INET, SOCK_STREAM)
-        socket_server.bind((self.host, self.port))
-        socket_server.listen(self.max_connect)
-        logger.debug("Server running on port %d" % self.port)
+        """Main function. It handles the connection from peers to the indexing
+        server. Everytime a peer connects to the server, a new socket
+        is spawned to handle the communication with this specific
+        peer. Once the communication is over, this socket is closed.
+
+        """
+        self.listening_socket = socket(AF_INET, SOCK_STREAM)
+        self.listening_socket.bind((self.host, self.port))
+        self.listening_socket.listen(self.max_connect)
+        logger.debug("Indexing server listening on port %d", self.port)
 
         while True:
-            client_conn = socket_server.accept()
-            handler = Process(target=self.message_handler, args=(client_conn))
-            #handler.daemon = True
+            client_so, client_addr = self.listening_socket.accept()
+            handler = Process(target=self.message_handler, args=(client_so, client_addr))
+            handler.daemon = True
             handler.start()
-        socket_server.close()
+        self.listening_socket.close()
 
 if __name__ == '__main__':
     args = docopt(__doc__)
     #print args
     indexingServer = IndexingServer(args['<ip>'], int(args['<port>']), int(args['--max-conn']))
     indexingServer.run()
-
