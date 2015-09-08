@@ -25,8 +25,10 @@ class IndexingServer:
         self.max_connect = max_connect
 
         self.manager = Manager()
-        self.peers_dict = self.manager.dict()
-        self.files_dict = self.manager.dict()
+        self.peers_info = self.manager.dict()
+        self.file2peers = self.manager.dict()
+        self.files_info = self.manager.dict()
+        
         self.listening_socket = None
 
         self.actions = {
@@ -48,12 +50,13 @@ class IndexingServer:
         return True
 
     def __action_register(self, msg_exch, cmd_vec):
+        logger.debug("Action is a register")
+        
         return True
     
-
     def __action_list(self, msg_exch, cmd_vec):
         logger.debug("Action is a list")
-        available_files = self.files_dict.keys()
+        available_files = self.file2peers.keys()
         msg_exch.pkl_send(available_files)
         return True
 

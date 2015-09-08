@@ -48,7 +48,6 @@ class Peer:
             'echo': self.__action_echo,
         }
 
-
     def __IS_print(self, msg):
         arg = msg if type(msg) == str else repr(msg)
         print("IS> %s" % arg)
@@ -93,17 +92,42 @@ class Peer:
             self.__block_print(err_register)
         else:
             file_regex = cmd_vec[1]
-            for f in glob.glob(file_regex):
-                print f
+            # send information about every file sequentially
+            files_to_send = [f for f in glob.glob(file_regex) if os.path.isfile(f)]
+
+            # exit if the list of files to send is empty
+            if not files_to_send:
+                err_register_2 = """
+                Error: the regular expression does not match with any file.
+                """
+                self.__block_print(err_register_2)
+                return False
+            
+            ack = self.idxserv_msg_exch.send('register', ack=True)
+            if not ack:
+                logger.error("Error in communication with indexing server.")
+                return False
+
+            for f_name in files_to_send:
+                stats = os.stat(f_name)
+                f_size = stats.st_size
+                f_path = os.path.abspath(f_name)
+                f_tuple = (f_name, f_size, f_path)
+                self.idxserv_msg_exch.pkl_send(f_tuple)
+                self.files_dict[f_name] = f_tuple
+            
+            poison_pill = None
+                
+                
             
     def __action_list(self, cmd_vec):
         ack = self.idxserv_msg_exch.send('list', ack=True)
         if not ack:
-            logger.error("Error in communication with indexing server")
+            logger.error("Error in communication with indexing server.")
             return False
-        else:
-            file_list = self.idxserv_msg_exch.pkl_recv()
-            self.__IS_print(file_list)
+
+        file_list = self.idxserv_msg_exch.pkl_recv()
+        self.__IS_print(file_list)
 
     def __action_getid(self, cmd_vec=None):
         print(id(self))
