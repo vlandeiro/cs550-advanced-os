@@ -17,6 +17,8 @@ import errno
 import CommunicationProtocol as proto
 import glob
 import textwrap
+import os
+import os.path
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -36,7 +38,10 @@ class Peer:
         self.idxserv_socket = None
         self.idxserv_msg_exch = None
         self.peer_socket = None
-        self.files_dict = None
+        self.files_dict = {}
+
+        # TODO (optional): create checksum of each file using hashlib
+        # to identify it instead of identifying it by its name.
         
         self.actions = {
             'exit': lambda x: self.__quit_ui(),
@@ -45,7 +50,7 @@ class Peer:
             'register': self.__action_register,
             'list': self.__action_list,
             'getid': self.__action_getid,
-            'echo': self.__action_echo,
+            'echo': self.__action_echo
         }
 
     def __IS_print(self, msg):
@@ -54,7 +59,11 @@ class Peer:
 
     def __block_print(self, msg, col_width=80):
         print textwrap.fill(textwrap.dedent(msg).strip(), width=80)
-    
+
+    def __init_connection(self):
+        self.idxserv_msg_exch.send("init %d addr %s" % (id(self), self.listening_ip), ack=True)
+        self.idxserv_msg_exch.send("init %d port %d" % (id(self), self.listening_port), ack=True)
+
     def __action_lookup(self, cmd_vec):
         if len(cmd_vec) != 2:
             err_lookup = """
@@ -64,7 +73,7 @@ class Peer:
             self.__block_print(err_lookup)
         else:
             msg = " ".join(cmd_vec)
-            ack = self.idxserv_msg_exch.send(msg, ack=True)
+            ack = self.idxserv_msg_exch.send("%s %d" % (msg, id(self)), ack=True)
             if not ack:
                 logger.error("Error in communication with indexing server")
                 return False
@@ -73,12 +82,15 @@ class Peer:
                 self.__IS_print(peers_with_file)
 
                 if not peers_with_file:
-                    print("This file is not available in the registered peers")
+                    resp_print = """
+                    This file is not available in the other registered peers.                    
+                    """
+                    print()
                 else:
                     l_str = "" if len(peers_with_file) == 1 else "-%d" % len(peers_with_file) 
                     print("Select amongst these peers [1%s]" % l_str)
                     for i, peer in enumerate(peers_with_file):
-                        print("{:<4}{:<50}".format("[%d]" % i, peer))
+                        print("{:<4}{:<50}".format("[%d]" % i+1, peer))
                     user_choice = raw_input()
                     print("TODO: Implement user choice + connection to the matching peer + file transfer")
 
@@ -103,31 +115,50 @@ class Peer:
                 self.__block_print(err_register_2)
                 return False
             
-            ack = self.idxserv_msg_exch.send('register', ack=True)
+            ack = self.idxserv_msg_exch.send('register %d' % (id(self)), ack=True)
             if not ack:
                 logger.error("Error in communication with indexing server.")
                 return False
 
-            for f_name in files_to_send:
-                stats = os.stat(f_name)
+            logger.debug(files_to_send)
+            for f in files_to_send:
+                f_name = os.path.basename(f)
+                stats = os.stat(f)
                 f_size = stats.st_size
-                f_path = os.path.abspath(f_name)
+                f_path = os.path.abspath(f)
                 f_tuple = (f_name, f_size, f_path)
-                self.idxserv_msg_exch.pkl_send(f_tuple)
+                self.idxserv_msg_exch.pkl_send(f_tuple, ack=True)
                 self.files_dict[f_name] = f_tuple
             
             poison_pill = None
+            self.idxserv_msg_exch.pkl_send(poison_pill)
                 
                 
-            
     def __action_list(self, cmd_vec):
+        prefixes = ['', 'K', 'M', 'G', 'T', 'P']
         ack = self.idxserv_msg_exch.send('list', ack=True)
         if not ack:
             logger.error("Error in communication with indexing server.")
             return False
-
+        self.idxserv_msg_exch.send_dummy()
         file_list = self.idxserv_msg_exch.pkl_recv()
-        self.__IS_print(file_list)
+        if not file_list:
+            print("There is no file available on the Indexing Server.")
+        else:
+            print("{:<30}{:<10}{:<40}".format("Filename", "Size", "Path"))
+            print("-"*80)
+            for f_name, f_size, f_path in file_list:
+                # change file size to human readable
+                for prefix in prefixes:
+                    if f_size < 1024:
+                        break
+                    f_size = 1.*f_size/1024.
+                    f_size_str = "%.1f%sB" % (f_size, prefix)
+                    # reduce absolute path
+                    if len(f_path) > 40:
+                        f_path = f_path[:15] + " ... " + f_path[-15:]
+                        print("{:<30}{:<10}{:<40}".format(f_name, f_size_str, f_path))
+            
 
     def __action_getid(self, cmd_vec=None):
         print(id(self))
@@ -145,6 +176,7 @@ class Peer:
                 logger.error("Error in communication with indexing server")
                 return False
             else:
+                self.idxserv_msg_exch.send_dummy()
                 response = self.idxserv_msg_exch.recv()
                 self.__IS_print(response)
 
@@ -163,7 +195,7 @@ class Peer:
 
     def __quit_ui(self):
         if self.idxserv_socket is not None:
-            self.idxserv_msg_exch.send("close_connection", ack=True)
+            self.idxserv_msg_exch.send("close_connection %d" % id(self), ack=True)
             self.idxserv_socket.close()
         sys.exit(0)
         
@@ -194,6 +226,7 @@ class Peer:
             self.idxserv_socket = socket(AF_INET, SOCK_STREAM)
             self.idxserv_socket.connect((self.idxserv_ip, self.idxserv_port))
             self.idxserv_msg_exch = proto.MessageExchanger(self.idxserv_socket)
+            self.__init_connection()
         except error as e:
             if e.errno == errno.ECONNREFUSED:
                 logger.error("Connection refused by the Indexing Server. Are you sure the Indexing Server is running?\n")
@@ -236,7 +269,12 @@ class Peer:
 
         # Now run the user interface
         logger.debug("Starting the user interface.")
-        self.__run_ui()
+        try:
+            self.__run_ui()
+        except:
+            raise e
+        finally:
+            self.__quit_ui()
         
 if __name__ == '__main__':
     args = docopt(__doc__)
@@ -244,5 +282,7 @@ if __name__ == '__main__':
         run_args = json.load(config_fd)
     
     peer = Peer(**run_args)
+
     peer.run_ui()
+        
     
