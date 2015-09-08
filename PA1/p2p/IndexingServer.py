@@ -9,9 +9,10 @@ Options:
 from docopt import docopt
 from multiprocessing import Process, Manager
 from socket import *
-import logging
 
-BUFFER_SIZE = 4096
+import logging
+import CommunicationProtocol as proto
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -28,17 +29,46 @@ class IndexingServer:
         self.files_dict = self.manager.dict()
         self.listening_socket = None
 
+        self.valid_actions = ['echo', 'register', 'list', 'lookup']
+        self.actions = {
+            'echo': self.__action_echo,
+            'register': self.__action_register,
+            'list': self.__action_list,
+            'lookup': self.__action_lookup
+        }
+
+    def __action_echo(self, msg_exch, cmd_vec):
+        logger.debug("Action is an echo")
+        response = " ".join(cmd_vec[1:])
+        msg_exch.send(response)
+
+    def __action_register(self, msg_exch, cmd_vec):
+        pass
+
+    def __action_list(self, msg_exch, cmd_vec):
+        logger.debug("Action is a list")
+        available_files = self.files_dict.keys()
+        msg_exch.pkl_send(available_files)
+
+    def __action_lookup(self, msg_exch, cmd_vec):
+        pass
+    
     def message_handler(self, client_so, client_addr):
         logger.debug("Accepted connection from %s", client_addr)
-        pickled_msg = ''
+        msg_exch = proto.MessageExchanger(client_so)
+
         while True:
-            shard = client_so.recv(BUFFER_SIZE)
-            logger.debug("shard: " + shard)
-            if shard:
-                pickled_msg += shard
+            msg = msg_exch.recv()
+            cmd_vec = msg.split()
+            action = cmd_vec[0]
+            if action not in self.actions:
+                logger.debug("Sending err")
+                msg_exch.send_err()
             else:
-                break
-        logger.debug("pickle: " + pickled_msg)
+                logger.debug("Sending ack")
+                msg_exch.send_ack()
+                self.actions[action](msg_exch, cmd_vec)
+            
         client_so.close()
 
     def run(self):
