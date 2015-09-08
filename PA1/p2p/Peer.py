@@ -15,6 +15,8 @@ import json
 import sys
 import errno
 import CommunicationProtocol as proto
+import glob
+import textwrap
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -50,18 +52,55 @@ class Peer:
     def __IS_print(self, msg):
         arg = msg if type(msg) == str else repr(msg)
         print("IS> %s" % arg)
+
+    def __block_print(self, msg, col_width=80):
+        print textwrap.fill(textwrap.dedent(msg).strip(), width=80)
     
     def __action_lookup(self, cmd_vec):
-        logger.debug("TODO: implement lookup")
+        if len(cmd_vec) != 2:
+            err_lookup = """
+            Error: lookup command needs exactly one argument: the name of the
+            file to lookup.
+            """
+            self.__block_print(err_lookup)
+        else:
+            msg = " ".join(cmd_vec)
+            ack = self.idxserv_msg_exch.send(msg, ack=True)
+            if not ack:
+                logger.error("Error in communication with indexing server")
+                return False
+            else:
+                peers_with_file = self.idxserv_msg_exch.pkl_recv()
+                self.__IS_print(peers_with_file)
+
+                if not peers_with_file:
+                    print("This file is not available in the registered peers")
+                else:
+                    l_str = "" if len(peers_with_file) == 1 else "-%d" % len(peers_with_file) 
+                    print("Select amongst these peers [1%s]" % l_str)
+                    for i, peer in enumerate(peers_with_file):
+                        print("{:<4}{:<50}".format("[%d]" % i, peer))
+                    user_choice = raw_input()
+                    print("TODO: Implement user choice + connection to the matching peer + file transfer")
 
     def __action_register(self, cmd_vec):
-        logger.debug("TODO: implement register")
-
+        if len(cmd_vec) != 2:
+            err_register = """
+            Error: register command needs exactly one argument: the regular
+            expression to identify all the files to register (e.g db/*.txt for
+            all the files with a txt extension in the db folder).
+            """
+            self.__block_print(err_register)
+        else:
+            file_regex = cmd_vec[1]
+            for f in glob.glob(file_regex):
+                print f
+            
     def __action_list(self, cmd_vec):
         ack = self.idxserv_msg_exch.send('list', ack=True)
         if not ack:
             logger.error("Error in communication with indexing server")
-            return 0
+            return False
         else:
             file_list = self.idxserv_msg_exch.pkl_recv()
             self.__IS_print(file_list)
@@ -71,13 +110,16 @@ class Peer:
 
     def __action_echo(self, cmd_vec):
         if len(cmd_vec) == 1:
-            print("- Error: echo command need at least one argument.")
+            err_echo = """
+            Error: echo command needs at least one argument.
+            """
+            self.__block_print(err_echo)
         else:
             msg = " ".join(cmd_vec)
             ack = self.idxserv_msg_exch.send(msg, ack=True)
             if not ack:
                 logger.error("Error in communication with indexing server")
-                return 0
+                return False
             else:
                 response = self.idxserv_msg_exch.recv()
                 self.__IS_print(response)
@@ -93,10 +135,11 @@ class Peer:
         }
         keys = sorted(help_ui.keys())
         for k in keys:
-            sys.stdout.write("{:<15}{:<20}\n".format(k, help_ui[k]))
+            print("{:<15}{:<20}".format(k, help_ui[k]))
 
     def __quit_ui(self):
         if self.idxserv_socket is not None:
+            self.idxserv_msg_exch.send("close_connection", ack=True)
             self.idxserv_socket.close()
         sys.exit(0)
         
@@ -149,7 +192,7 @@ class Peer:
             cmd_action = cmd_vec[0] if len(cmd_vec) >= 1 else ''
             # If invalid command, print error message to user
             if cmd_action not in self.actions.keys():
-                print "- Error: unvalid command."
+                self.__block_print("Error: unvalid command.")
                 self.actions['help'](None)
             # If valid command, execute the matching action
             else:

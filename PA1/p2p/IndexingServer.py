@@ -29,35 +29,50 @@ class IndexingServer:
         self.files_dict = self.manager.dict()
         self.listening_socket = None
 
-        self.valid_actions = ['echo', 'register', 'list', 'lookup']
         self.actions = {
             'echo': self.__action_echo,
             'register': self.__action_register,
             'list': self.__action_list,
-            'lookup': self.__action_lookup
+            'lookup': self.__action_lookup,
+            'close_connection': self.__action_close_connection
         }
 
+    def __action_close_connection(self, msg_exch, cmd_vec):
+        logger.debug("Closing connection to peer")
+        return False
+    
     def __action_echo(self, msg_exch, cmd_vec):
         logger.debug("Action is an echo")
         response = " ".join(cmd_vec[1:])
         msg_exch.send(response)
+        return True
 
     def __action_register(self, msg_exch, cmd_vec):
-        pass
+        return True
+    
 
     def __action_list(self, msg_exch, cmd_vec):
         logger.debug("Action is a list")
         available_files = self.files_dict.keys()
         msg_exch.pkl_send(available_files)
+        return True
 
     def __action_lookup(self, msg_exch, cmd_vec):
-        pass
+        logger.debug("Action is a lookup")
+        filename = cmd_vec[1]
+        if filename in self.peers_dict:
+            peers = self.peers_dict[cmd_vec[1]]
+            msg_exch.pkl_send(peers)
+        else: # file not registered by any peer
+            msg_exch.pkl_send([])
+        return True
     
     def message_handler(self, client_so, client_addr):
         logger.debug("Accepted connection from %s", client_addr)
         msg_exch = proto.MessageExchanger(client_so)
 
-        while True:
+        open_conn = True
+        while open_conn:
             msg = msg_exch.recv()
             cmd_vec = msg.split()
             action = cmd_vec[0]
@@ -67,7 +82,7 @@ class IndexingServer:
             else:
                 logger.debug("Sending ack")
                 msg_exch.send_ack()
-                self.actions[action](msg_exch, cmd_vec)
+                open_conn = self.actions[action](msg_exch, cmd_vec)
             
         client_so.close()
 
