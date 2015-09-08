@@ -14,8 +14,8 @@ import logging
 import json
 import sys
 import errno
+import CommunicationProtocol as proto
 
-BUFFER_SIZE = 4096
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -30,12 +30,77 @@ class Peer:
         self.idxserv_port = idxserv_port
         self.max_connect = max_connect
     
-        self.manager = Manager()
         self.listening_socket = None
         self.idxserv_socket = None
+        self.idxserv_msg_exch = None
         self.peer_socket = None
+        self.files_dict = None
+        
+        self.actions = {
+            'exit': lambda x: self.__quit_ui(),
+            'help': lambda x: self.__display_help_ui(),
+            'lookup': self.__action_lookup,
+            'register': self.__action_register,
+            'list': self.__action_list,
+            'getid': self.__action_getid,
+            'echo': self.__action_echo,
+        }
 
-    def run_server(self):
+
+    def __IS_print(self, msg):
+        arg = msg if type(msg) == str else repr(msg)
+        print("IS> %s" % arg)
+    
+    def __action_lookup(self, cmd_vec):
+        logger.debug("TODO: implement lookup")
+
+    def __action_register(self, cmd_vec):
+        logger.debug("TODO: implement register")
+
+    def __action_list(self, cmd_vec):
+        ack = self.idxserv_msg_exch.send('list', ack=True)
+        if not ack:
+            logger.error("Error in communication with indexing server")
+            return 0
+        else:
+            file_list = self.idxserv_msg_exch.pkl_recv()
+            self.__IS_print(file_list)
+
+    def __action_getid(self, cmd_vec=None):
+        print(id(self))
+
+    def __action_echo(self, cmd_vec):
+        if len(cmd_vec) == 1:
+            print("- Error: echo command need at least one argument.")
+        else:
+            msg = " ".join(cmd_vec)
+            ack = self.idxserv_msg_exch.send(msg, ack=True)
+            if not ack:
+                logger.error("Error in communication with indexing server")
+                return 0
+            else:
+                response = self.idxserv_msg_exch.recv()
+                self.__IS_print(response)
+
+    def __display_help_ui(self):
+        help_ui = {
+            'exit': 'Shut down this peer.',
+            'lookup': 'Ask the indexing server for the lists of other peers that have a given file.',
+            'register': 'Register to the indexing server.',
+            'list': 'List all the available files in the indexing server.',
+            'help': 'Display the help screen.',
+            'getid': 'Return the peer id.'
+        }
+        keys = sorted(help_ui.keys())
+        for k in keys:
+            sys.stdout.write("{:<15}{:<20}\n".format(k, help_ui[k]))
+
+    def __quit_ui(self):
+        if self.idxserv_socket is not None:
+            self.idxserv_socket.close()
+        sys.exit(0)
+        
+    def __run_server(self):
         """This function handles the connection from other peer to obtain
         files.
         
@@ -52,16 +117,6 @@ class Peer:
             handler.start()
         self.listening_socket.close()
 
-    def display_help(self, help_dict):
-        keys = sorted(help_dict.keys())
-        for k in keys:
-            sys.stdout.write("{:<15}{:<20}\n".format(k, help_dict[k]))
-
-    def quit_ui(self):
-        if self.idxserv_socket is not None:
-            self.idxserv_socket.close()
-        sys.exit(0)
-        
     def run_ui(self):
         """This function handles the user input and the connections to the
         indexing server and the other peers.
@@ -71,50 +126,35 @@ class Peer:
         try:
             self.idxserv_socket = socket(AF_INET, SOCK_STREAM)
             self.idxserv_socket.connect((self.idxserv_ip, self.idxserv_port))
+            self.idxserv_msg_exch = proto.MessageExchanger(self.idxserv_socket)
         except error as e:
             if e.errno == errno.ECONNREFUSED:
-                sys.stderr.write("Connection refused by the Indexing Server. Are you sure the Indexing Server is running?\n")
+                logger.error("Connection refused by the Indexing Server. Are you sure the Indexing Server is running?\n")
                 sys.exit(1)
         
-        valid_ui_commands = ['echo', 'exit', 'lookup', 'register', 'catalog', 'help', 'getid']
-        help_ui = {
-            'exit': 'Shut down this peer.',
-            'lookup': 'Ask the indexing server for the lists of other peers that have a given file.',
-            'register': 'Register to the indexing server.',
-            'catalog': 'List all the available files in the indexing server.',
-            'help': 'Display the help screen.',
-            'getid': 'Return the peer id.'}
-
         while True:
             sys.stdout.write("$> ")
+            sys.stdout.flush()
+            
+            # Getting user input
             try:
                 cmd_str = raw_input()
-            except EOFError as e:
-                self.quit_ui()
+            except KeyboardInterrupt as e:
+                self.__quit_ui()
+            except EOFError as e:  
+                self.__quit_ui()
             cmd_vec = cmd_str.split()
-            if cmd_vec[0] not in valid_ui_commands:
+
+            # Parsing user command
+            cmd_action = cmd_vec[0] if len(cmd_vec) >= 1 else ''
+            # If invalid command, print error message to user
+            if cmd_action not in self.actions.keys():
                 print "- Error: unvalid command."
-                self.display_help(help_ui)
-            elif cmd_vec[0] == 'exit':
-                self.quit_ui()
-            elif cmd_vec[0] == 'help':
-                self.display_help(help_ui)
-            elif cmd_vec[0] == 'lookup':
-                print("TODO: implement lookup")
-            elif cmd_vec[0] == 'register':
-                print("TODO: implement register")
-            elif cmd_vec[0] == 'catalog':
-                print("TODO: implement catalog")
-            elif cmd_vec[0] == 'getid':
-                print(id(self))
-            elif cmd_vec[0] == 'echo':
-                if len(cmd_vec) == 1:
-                    print("- Error: echo command need at least one argument.")
-                else:
-                    msg = " ".join(cmd_vec[1:])
-                    self.idxserv_socket.send(msg)
-            
-        
+                self.actions['help'](None)
+            # If valid command, execute the matching action
+            else:
+                self.actions[cmd_action](cmd_vec)
+
     def run(self):
         """Function that launches the different parts (server, user interface,
         client, file management, ...) of the peer.
@@ -122,14 +162,15 @@ class Peer:
         """
         # Start by running the server in a dedicated thread.
         logger.debug("Starting the peer server.")
-        server = Process(target=self.run_server)
+        server = Process(target=self.__run_server)
         server.daemon = True
         server.start()
         logger.debug("Peer server running.")
 
         # Now run the user interface
         logger.debug("Starting the user interface.")
-
+        self.__run_ui()
+        
 if __name__ == '__main__':
     args = docopt(__doc__)
     with open(args['<config_file>']) as config_fd:
