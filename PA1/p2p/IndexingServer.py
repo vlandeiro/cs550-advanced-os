@@ -38,8 +38,18 @@ class IndexingServer:
             'list': self.__action_list,
             'lookup': self.__action_lookup,
             'close_connection': self.__action_close_connection,
-            'init': self.__action_init
+            'init': self.__action_init,
+            'get_peer': self.__action_get_peer
         }
+
+    def __action_get_peer(self, msg_exch, cmd_vec):
+        peerid = int(cmd_vec[1])
+        if peerid in self.peers_info:
+            d = self.peers_info[peerid]
+            msg_exch.pkl_send(d)
+        else:
+            msg_exch.pkl_send(None)
+        return True
 
     def __action_init(self, msg_exch, cmd_vec):
         logger.debug("Action is an init")
@@ -54,8 +64,9 @@ class IndexingServer:
 
     def __action_close_connection(self, msg_exch, cmd_vec):
         peerid = int(cmd_vec[1])
-        logger.debug("Closing connection to peer")
-        # remove all registered files
+        logger.debug("Closing connection to peer " + str(peerid))
+        
+        # remove all files registered by this peer
         if 'files' in self.peers_info[peerid]:
             for f_name in self.peers_info[peerid]['files']:
                 l = self.file2peers[f_name]
@@ -95,13 +106,12 @@ class IndexingServer:
                 peer_dict['files'] = [f_name]
             self.peers_info[peerid] = peer_dict
             # add to index
-            if f_name in self.file2peers:
-                self.file2peers[f_name].append(peerid)
-            else:
-                self.file2peers[f_name] = [peerid]
+            peers_list = self.file2peers.get(f_name, [])
+            peers_list.append(peerid)
+            self.file2peers[f_name] = peers_list
             msg_exch.send_ack()
         return True
-    
+
     def __action_list(self, msg_exch, cmd_vec):
         logger.debug("Action is a list")
         dummy = msg_exch.recv()
@@ -111,19 +121,21 @@ class IndexingServer:
 
     def __action_lookup(self, msg_exch, cmd_vec):
         logger.debug("Action is a lookup")
-        filename = cmd_vec[1]
+        dummy = msg_exch.recv()
+
+        search = cmd_vec[1]
         peerid = -1
         if len(cmd_vec) > 2:
             peerid = int(cmd_vec[2])
-        if filename in self.file2peers:
+        if search in self.file2peers:
             # return ids of the peers that have this file
-            peer_ids = [x for x in self.file2peers[cmd_vec[1]] if x != peerid]
+            peer_ids = [pid for pid in self.file2peers[search] if pid != peerid]
             msg_exch.pkl_send(peer_ids)
         else: # file not registered by any peer
             msg_exch.pkl_send([])
         return True
     
-    def message_handler(self, client_so, client_addr):
+    def __message_handler(self, client_so, client_addr):
         logger.debug("Accepted connection from %s", client_addr)
         msg_exch = proto.MessageExchanger(client_so)
         
@@ -137,9 +149,6 @@ class IndexingServer:
             else:
                 msg_exch.send_ack()
                 open_conn = self.actions[action](msg_exch, cmd_vec)
-                logger.debug(self.peers_info)
-                logger.debug(self.file2peers)
-                logger.debug(self.files_info)
         client_so.close()
 
     def run(self):
@@ -156,7 +165,7 @@ class IndexingServer:
 
         while True:
             client_so, client_addr = self.listening_socket.accept()
-            handler = Process(target=self.message_handler, args=(client_so, client_addr))
+            handler = Process(target=self.__message_handler, args=(client_so, client_addr))
             handler.daemon = True
             handler.start()
         self.listening_socket.close()

@@ -2,6 +2,7 @@ from socket import *
 
 import logging
 import pickle
+import sys
 
 END_MSG = '\r\n\n'
 ACK = "0"
@@ -11,7 +12,7 @@ DUMMY = "DUMMY"
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 
 class MessageExchanger:
     def __init__(self, sock):
@@ -64,7 +65,7 @@ class MessageExchanger:
 
         """
         str_obj = pickle.dumps(obj)
-        self.send(str_obj, ack=ack)
+        return self.send(str_obj, ack=ack)
 
     def pkl_recv(self):
         """Read from the socket and unpickle the content.
@@ -72,3 +73,26 @@ class MessageExchanger:
         """
         str_obj = self.recv()
         return pickle.loads(str_obj)
+
+    def file_send(self, f_path):
+        logger.debug("SEND FILE " + f_path)
+        with open(f_path, "rb") as f_to_send:
+            data = True
+            while data:
+                data = f_to_send.read(BUFFER_SIZE)
+                self.sock.send(data)
+        self.sock.send(END_MSG)
+
+    def file_recv(self, f_name):
+        logger.debug("RECV FILE " + f_name)
+        l = len(END_MSG)
+        with open(f_name, "wb") as out_f:
+            while True:
+                sys.stdout.write(".")
+                shard = self.sock.recv(BUFFER_SIZE)
+                if shard[-l:] == END_MSG:
+                    out_f.write(shard[:-l])
+                    break
+                else:
+                    out_f.write(shard)
+            
