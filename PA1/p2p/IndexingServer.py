@@ -17,6 +17,9 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+# TODO:
+# - avoid registering of same peer
+# - select folder to output downloaded files
 
 class IndexingServer:
     def __init__(self, host, port, max_connect=10):
@@ -101,13 +104,13 @@ class IndexingServer:
             # add to peer info
             peer_dict = self.peers_info[peerid]
             if "files" in peer_dict:
-                peer_dict['files'].append(f_name)
+                peer_dict['files'].add(f_name)
             else:
-                peer_dict['files'] = [f_name]
+                peer_dict['files'] = set([f_name])
             self.peers_info[peerid] = peer_dict
             # add to index
-            peers_list = self.file2peers.get(f_name, [])
-            peers_list.append(peerid)
+            peers_list = self.file2peers.get(f_name, set())
+            peers_list.add(peerid)
             self.file2peers[f_name] = peers_list
             msg_exch.send_ack()
         return True
