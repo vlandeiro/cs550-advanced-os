@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 LISTENING_TIMEOUT = 0.2
 
+# TODO
+# - add command auto completion and history in cli (optional)
+# - use pool of threads in both peer and server to simplify operations
+
 def format_filesize(f_size):
     prefixes = ['', 'K', 'M', 'G', 'T', 'P']
     # change file size to human readable
@@ -101,7 +105,7 @@ class Peer:
 
     def __ui_action_exit(self, cmd_vec):
         self.server_running.put(False)
-        time.sleep(LISTENING_TIMEOUT)
+        time.sleep(2*LISTENING_TIMEOUT)
         self.__quit_ui()
         return False
     
@@ -312,18 +316,21 @@ class Peer:
         while True:
             try:
                 peer_so, peer_addr = self.listening_socket.accept()
+                handler = Process(target=self.__peer_message_handler, args=(peer_so, peer_addr))
+                handler.daemon = True
+                handler.start()
+            except KeyboardInterrupt:
+                pass
             except timeout as e:
                 if not self.server_running.empty():
+                    print("Shutting down service to other peers.")
                     break
-                else:
-                    continue
-            handler = Process(target=self.__peer_message_handler, args=(peer_so, peer_addr))
-            handler.daemon = True
-            handler.start()
+
         self.__quit_server()
         
     def __quit_ui(self):
         if self.idxserv_socket is not None:
+            print("Closing connection to indexing server.")
             self.idxserv_msg_exch.send("close_connection %d" % id(self), ack=True)
             self.idxserv_socket.close()
             self.idxserv_socket = None
@@ -349,20 +356,23 @@ class Peer:
         while retval:
             sys.stdout.write("$> ")
             sys.stdout.flush()
-            
-            # Getting user input
-            cmd_str = raw_input()
-            cmd_vec = cmd_str.split()
 
-            # Parsing user command
-            cmd_action = cmd_vec[0] if len(cmd_vec) >= 1 else ''
-            # If invalid command, print error message to user
-            if cmd_action not in self.ui_actions.keys():
-                self.__block_print("Error: unvalid command.")
-                self.ui_actions['help'](None)
-            # If valid command, execute the matching action
-            else:
-                retval = self.ui_actions[cmd_action](cmd_vec)
+            try:
+                # Getting user input
+                cmd_str = raw_input()
+                cmd_vec = cmd_str.split()
+                
+                # Parsing user command
+                cmd_action = cmd_vec[0] if len(cmd_vec) >= 1 else ''
+                # If invalid command, print error message to user
+                if cmd_action not in self.ui_actions.keys():
+                    self.__block_print("Error: unvalid command.")
+                    self.ui_actions['help'](None)
+                # If valid command, execute the matching action
+                else:
+                    retval = self.ui_actions[cmd_action](cmd_vec)
+            except KeyboardInterrupt as e:
+                pass
 
     def run(self):
         """Function that launches the different parts (server, user interface,
@@ -379,8 +389,8 @@ class Peer:
             # Now run the user interface
             logger.debug("Starting the user interface.")
             self.__run_ui()
-        except KeyboardInterrupt as e:
-            print "Shutting down peer."
+        except EOFError as e:
+            print "\nShutting down peer."
         except:
             raise
         finally:
