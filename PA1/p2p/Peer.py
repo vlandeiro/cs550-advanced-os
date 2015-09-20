@@ -1,12 +1,7 @@
 """
 Usage:
-    Peer.py run <config_file> [--max-conn=M]
- 
- Options:
-     --help -h       Display this screen.
-     --max-conn=M    Maximum number of allowed connections to the server [default: 10].
+    python Peer.py <config.json>
  """
-from docopt import docopt
 from multiprocessing import Process, Manager, Queue
 from socket import *
 
@@ -23,33 +18,26 @@ import time
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 LISTENING_TIMEOUT = 0.2
 
-# TODO
-# - add command auto completion and history in cli (optional)
-# - use pool of threads in both peer and server to simplify operations
-
-def format_filesize(f_size):
-    prefixes = ['', 'K', 'M', 'G', 'T', 'P']
-    # change file size to human readable
-    for prefix in prefixes:
-        if f_size < 1024:
-            break
-        f_size = 1.*f_size/1024.
-    f_size_str = "%.1f%sB" % (f_size, prefix)
-    return f_size_str
 
 class Peer:
-    def __init__(self, listening_ip, listening_port,
-                 idxserv_ip, idxserv_port,
-                 max_connect=10):
+    def __init__(self, listening_ip, listening_port, idxserv_ip, idxserv_port,
+                 pool_size=10, files_regex="./*", download_dir="./"):
         self.listening_ip = listening_ip
         self.listening_port = listening_port
+        
         self.idxserv_ip = idxserv_ip
         self.idxserv_port = idxserv_port
-        self.max_connect = max_connect
-    
+        self.pool_size = pool_size
+        self.files_regex = files_regex
+        self.download_dir = os.path.abspath(download_dir)
+        print self.download_dir
+        if not os.path.isdir(self.download_dir):
+            raise ValueError("Download directory does not exist")
+
+        
         self.listening_socket = None
         self.idxserv_socket = None
         self.idxserv_msg_exch = None
@@ -57,7 +45,7 @@ class Peer:
 
         self.manager = Manager()
         self.files_dict = self.manager.dict()
-        self.server_running = self.manager.Queue()
+        self.server_running = self.manager.Value('i', 0)
         
         # TODO (optional): create checksum of each file using hashlib
         # to identify it instead of identifying it by its name.
@@ -104,7 +92,6 @@ class Peer:
         return True
 
     def __ui_action_exit(self, cmd_vec):
-        self.server_running.put(False)
         time.sleep(2*LISTENING_TIMEOUT)
         self.__quit_ui()
         return False
@@ -176,53 +163,45 @@ class Peer:
                         user_choice = False if raw_inp.lower() == 'n' else True
                         if user_choice:
                             fs_msg_exch.send_ack()
-                            fs_msg_exch.file_recv(f_name)
-                            print("File received and stored locally")
+                            f_fullpath = os.path.join(self.download_dir, f_name)
+                            fs_msg_exch.file_recv(f_fullpath, f_size)
+                            print("File received and stored locally.")
                         else:
                             fs_msg_exch.send_err()
                             print("Abort file transfer.")
         return True
     
     def __ui_action_register(self, cmd_vec):
-        if len(cmd_vec) != 2:
-            err_register = """
-            Error: register command needs exactly one argument: the regular
-            expression to identify all the files to register (e.g db/*.txt for
-            all the files with a txt extension in the db folder).
+        # send information about every file sequentially
+        files_to_send = [f for f in glob.glob(self.files_regex) if os.path.isfile(f)]
+        
+        # exit if the list of files to send is empty
+        if not files_to_send:
+            err_register_2 = """
+            Error: the regular expression does not match with any file to register.
             """
-            self.__block_print(err_register)
-        else:
-            file_regex = cmd_vec[1]
-            # send information about every file sequentially
-            files_to_send = [f for f in glob.glob(file_regex) if os.path.isfile(f)]
-
-            # exit if the list of files to send is empty
-            if not files_to_send:
-                err_register_2 = """
-                Error: the regular expression does not match with any file.
-                """
-                self.__block_print(err_register_2)
-                return True
+            self.__block_print(err_register_2)
+            return True
             
-            ack = self.idxserv_msg_exch.send('register %d' % (id(self)), ack=True)
-            if not ack:
-                logger.error("Error in communication with indexing server.")
-                return True
+        ack = self.idxserv_msg_exch.send('register %d' % (id(self)), ack=True)
+        if not ack:
+            logger.error("Error in communication with indexing server.")
+            return True
 
-            logger.debug(files_to_send)
-            files_dict = self.files_dict
-            for f in files_to_send:
-                f_name = os.path.basename(f)
-                stats = os.stat(f)
-                f_size = stats.st_size
-                f_path = os.path.abspath(f)
-                f_tuple = (f_name, f_size, f_path)
-                self.idxserv_msg_exch.pkl_send(f_tuple, ack=True)
-                files_dict[f_name] = f_tuple
-            self.files_dict = files_dict
+        logger.debug(files_to_send)
+        files_dict = self.files_dict
+        for f in files_to_send:
+            f_name = os.path.basename(f)
+            stats = os.stat(f)
+            f_size = stats.st_size
+            f_path = os.path.abspath(f)
+            f_tuple = (f_name, f_size, f_path)
+            self.idxserv_msg_exch.pkl_send(f_tuple, ack=True)
+            files_dict[f_name] = f_tuple
+        self.files_dict = files_dict
             
-            poison_pill = None
-            self.idxserv_msg_exch.pkl_send(poison_pill)
+        poison_pill = None
+        self.idxserv_msg_exch.pkl_send(poison_pill)
         return True
         
     def __ui_action_list(self, cmd_vec):
@@ -310,37 +289,54 @@ class Peer:
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
         self.listening_socket.settimeout(LISTENING_TIMEOUT)
         self.listening_socket.bind((self.listening_ip, self.listening_port))
-        self.listening_socket.listen(self.max_connect)
+        self.listening_socket.listen(self.pool_size)
         logger.debug("Peer server listening on port %d", self.listening_port)
-            
+
+        self.server_running.value = 1
         while True:
             try:
                 peer_so, peer_addr = self.listening_socket.accept()
-                handler = Process(target=self.__peer_message_handler, args=(peer_so, peer_addr))
+                handler = Process(target=self.__peer_message_handler,
+                                  args=(peer_so, peer_addr))
                 handler.daemon = True
                 handler.start()
             except KeyboardInterrupt:
                 pass
             except timeout as e:
-                if not self.server_running.empty():
-                    print("Shutting down service to other peers.")
+                try:
+                    if not self.server_running.value:
+                        print("Shutting down service to other peers.")
+                # avoid Broken Pipe error registered as a bug in python 2.7
+                except IOError as e: 
+                    if e.errno == 32:
+                        pass
+                    else:
+                        raise
                     break
 
         self.__quit_server()
         
     def __quit_ui(self):
-        if self.idxserv_socket is not None:
+        logger.debug("Quitting UI")
+        if self.idxserv_socket is not None and self.ui_running:
             print("Closing connection to indexing server.")
             self.idxserv_msg_exch.send("close_connection %d" % id(self), ack=True)
             self.idxserv_socket.close()
             self.idxserv_socket = None
+        try:
+            self.server_running.value = 0
+        except IOError as e:
+            if e.errno == 32:
+                pass
+            else:
+                raise
         return False
 
     def __run_ui(self):
         """This function handles the user input and the connections to the
         indexing server and the other peers.
-
         """
+        self.ui_running = False
         # Start by connecting to the Indexing Server
         try:
             self.idxserv_socket = socket(AF_INET, SOCK_STREAM)
@@ -352,6 +348,7 @@ class Peer:
                 logger.error("Connection refused by the Indexing Server. Are you sure the Indexing Server is running?")
                 sys.exit(1)
 
+        self.ui_running = True
         retval = True
         while retval:
             sys.stdout.write("$> ")
@@ -380,29 +377,42 @@ class Peer:
 
         """
         try:
-            # Start by running the server in a dedicated thread.
+            # First, start the server in a dedicated thread.
             logger.debug("Starting the peer server.")
             server = Process(target=self.__run_server)
             server.start()
             logger.debug("Peer server running.")
 
-            # Now run the user interface
+            # Then, start the user interface
             logger.debug("Starting the user interface.")
             self.__run_ui()
         except EOFError as e:
             print "\nShutting down peer."
         except:
             raise
-        finally:
             self.__quit_ui()
-        
-if __name__ == '__main__':
-    args = docopt(__doc__)
-    with open(args['<config_file>']) as config_fd:
-        run_args = json.load(config_fd)
-    
-    peer = Peer(**run_args)
 
-    peer.run()
+def usage_error():
+    print(__doc__.strip())
+    sys.exit(1)
+
+def format_filesize(f_size):
+    prefixes = ['', 'K', 'M', 'G', 'T', 'P']
+    # change file size to human readable
+    for prefix in prefixes:
+        if f_size < 1024:
+            break
+        f_size = 1.*f_size/1024.
+    f_size_str = "%.1f%sB" % (f_size, prefix)
+    return f_size_str
+
+if __name__ == '__main__':
+    # parse arguments
+    args = sys.argv
+    if len(args) != 2:
+        usage_error()
+    with open(args[1]) as config_fd:
+        run_args = json.load(config_fd)
         
-    
+    peer = Peer(**run_args)
+    peer.run()
