@@ -128,8 +128,11 @@ class IndexingServer:
             peerid = int(cmd_vec[2])
         if search in self.file2peers:
             # return ids of the peers that have this file
-            peer_ids = [pid for pid in self.file2peers[search] if pid != peerid]
-            msg_exch.pkl_send(peer_ids)
+            to_return = []
+            for pid in self.file2peers[search]:
+                if pid in self.peers_info and pid != peerid:
+                    to_return.append(self.peers_info[pid])
+            msg_exch.pkl_send(to_return)
         else: # file not registered by any peer
             msg_exch.pkl_send([])
         return True
@@ -162,13 +165,18 @@ class IndexingServer:
         self.listening_socket.listen(self.pool_size)
         logger.debug("Indexing server listening on port %d", self.listening_port)
 
-        while True:
-            logger.debug("Entering the infinite loop")
-            client_so, client_addr = self.listening_socket.accept()
-            handler = Process(target=self.__message_handler, args=(client_so, client_addr))
-            handler.daemon = True
-            handler.start()
-        self.listening_socket.close()
+        try:
+            while True:
+                logger.debug("Entering the infinite loop")
+                client_so, client_addr = self.listening_socket.accept()
+                handler = Process(target=self.__message_handler, args=(client_so, client_addr))
+                handler.daemon = True
+                handler.start()
+        except KeyboardInterrupt:
+            sys.stderr.write("\r")
+            logger.info("Shutting down Indexing Server.")
+        finally:
+            self.listening_socket.close()
 
 def usage_error():
     print(__doc__.strip())
@@ -183,3 +191,4 @@ if __name__ == '__main__':
         run_args = json.load(config_fd)
     indexingServer = IndexingServer(**run_args)
     indexingServer.run()
+        
