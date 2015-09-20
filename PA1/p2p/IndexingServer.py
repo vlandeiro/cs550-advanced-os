@@ -1,15 +1,12 @@
 """
 Usage:
-   IndexingServer.py run <ip> <port> [--max-conn=M]
-
-Options:
-    --help -h       Display this screen.
-    --max-conn=M    Maximum number of allowed connections to the server [default: 10].
+   python IndexingServer.py <config.json>
 """
-from docopt import docopt
 from multiprocessing import Process, Manager
 from socket import *
 
+import sys
+import json
 import logging
 import CommunicationProtocol as proto
 
@@ -22,16 +19,15 @@ logger.setLevel(logging.DEBUG)
 # - select folder to output downloaded files
 
 class IndexingServer:
-    def __init__(self, host, port, max_connect=10):
-        self.host = host
-        self.port = port
-        self.max_connect = max_connect
+    def __init__(self, listening_ip, listening_port, pool_size=10):
+        self.listening_ip = listening_ip
+        self.listening_port = listening_port
+        self.pool_size = pool_size
 
         self.manager = Manager()
         self.peers_info = self.manager.dict()
         self.file2peers = self.manager.dict()
         self.files_info = self.manager.dict()
-        # TODO (optional): add a poll mechanism to watch dead peers
         
         self.listening_socket = None
 
@@ -162,19 +158,28 @@ class IndexingServer:
 
         """
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
-        self.listening_socket.bind((self.host, self.port))
-        self.listening_socket.listen(self.max_connect)
-        logger.debug("Indexing server listening on port %d", self.port)
+        self.listening_socket.bind((self.listening_ip, self.listening_port))
+        self.listening_socket.listen(self.pool_size)
+        logger.debug("Indexing server listening on port %d", self.listening_port)
 
         while True:
+            logger.debug("Entering the infinite loop")
             client_so, client_addr = self.listening_socket.accept()
             handler = Process(target=self.__message_handler, args=(client_so, client_addr))
             handler.daemon = True
             handler.start()
         self.listening_socket.close()
 
+def usage_error():
+    print(__doc__.strip())
+    sys.exit(1)
+
 if __name__ == '__main__':
-    args = docopt(__doc__)
-    #print args
-    indexingServer = IndexingServer(args['<ip>'], int(args['<port>']), int(args['--max-conn']))
+    args = sys.argv
+    if len(args) != 2:
+        usage_error()
+
+    with open(args[1]) as config_fd:
+        run_args = json.load(config_fd)
+    indexingServer = IndexingServer(**run_args)
     indexingServer.run()
