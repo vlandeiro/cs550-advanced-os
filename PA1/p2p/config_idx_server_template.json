@@ -1,0 +1,5 @@
+{
+    "listening_ip": "localhost",
+    "listening_port": 4000,
+    "pool_size": 2
+}

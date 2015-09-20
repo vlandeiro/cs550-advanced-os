@@ -2,5 +2,8 @@
     "listening_ip": "localhost",
     "listening_port": 5000,
     "idxserv_ip": "localhost",
-    "idxserv_port": 4000
+    "idxserv_port": 4000,
+    "pool_size": 10,
+    "files_regex": "files_dir/*",
+    "download_dir": "download_dir"
 }
