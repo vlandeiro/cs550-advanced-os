@@ -3,6 +3,7 @@ from socket import *
 import logging
 import pickle
 import sys
+import os
 
 END_MSG = '\r\n\n'
 ACK = "0"
@@ -89,21 +90,21 @@ class MessageExchanger:
 
         total_size = 0
         sys.stdout.write("Downloading file...")
-        with open(f_name, "wb") as out_f:
-            while True:
-                shard = self.sock.recv(BUFFER_SIZE)
-                total_size += sys.getsizeof(shard)
-                if f_size is None:
-                    sys.stdout.write("\rDownloading file... %d bytes" % total_size)
-                    # print downloaded size
-                    pass
-                else:
-                    # print percentage downloaded
-                    perc = int(100.*total_size/f_size)
-                    sys.stdout.write("\rDownloading file... %3d%%" % perc)
-                if shard[-l:] == END_MSG:
-                    out_f.write(shard[:-l])
-                    break
-                else:
-                    out_f.write(shard)
+        out_f = os.open(f_name, os.O_WRONLY|os.O_CREAT)
+        keep_reading = True
+        while keep_reading:
+            shard = self.sock.recv(BUFFER_SIZE)
+            if shard[-l:] == END_MSG:
+                shard = shard[:-l]
+                keep_reading = False
+            nb_bytes_written = os.write(out_f, shard)
+                
+            total_size += nb_bytes_written
+            if f_size is None:
+                # print downloaded size
+                sys.stdout.write("\rDownloading file... %d bytes" % total_size)
+            else:
+                # print percentage downloaded
+                perc = int(100.*total_size/f_size)
+                sys.stdout.write("\rDownloading file... %3d%%" % perc)
         print
