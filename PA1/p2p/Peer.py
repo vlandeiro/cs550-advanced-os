@@ -33,7 +33,6 @@ class Peer:
         self.pool_size = pool_size
         self.files_regex = files_regex
         self.download_dir = os.path.abspath(download_dir)
-        print self.download_dir
         if not os.path.isdir(self.download_dir):
             raise ValueError("Download directory does not exist")
 
@@ -57,7 +56,8 @@ class Peer:
             'register': self.__ui_action_register,
             'list': self.__ui_action_list,
             'getid': self.__ui_action_getid,
-            'echo': self.__ui_action_echo
+            'echo': self.__ui_action_echo,
+            'search': self.__ui_action_search
         }
 
         self.client_actions = {
@@ -95,17 +95,19 @@ class Peer:
         time.sleep(2*LISTENING_TIMEOUT)
         self.__quit_ui()
         return False
-    
-    def __ui_action_lookup(self, cmd_vec):
+
+    def __search_file(self, cmd_vec):
         if len(cmd_vec) != 2:
             err_lookup = """
-            Error: lookup command needs exactly one argument: the name of the
+            Error: %s command needs exactly one argument: the name of the
             file to lookup.
-            """
+            """ % cmd_vec[0]
             self.__block_print(err_lookup)
         else:
+            cmd_vec[0] = "lookup"
             msg = " ".join(cmd_vec)
             f_name = cmd_vec[1]
+            # send lookup message to indexing server
             ack = self.idxserv_msg_exch.send("%s %d" % (msg, id(self)), ack=True)
             if not ack:
                 logger.error("Error in communication with indexing server")
@@ -113,62 +115,65 @@ class Peer:
             else:
                 self.idxserv_msg_exch.send_dummy()
                 peers_with_file = self.idxserv_msg_exch.pkl_recv()
-
-                if not peers_with_file:
-                    resp_print = """
-                    This file is not available in the other registered peers.                    
-                    """
-                    self.__block_print(resp_print)
-                    return True
+        return peers_with_file
+    
+    def __ui_action_search(self, cmd_vec):
+        peers_with_file = self.__search_file(cmd_vec)
+        self.__IS_print(peers_with_file)
+        return True
+    
+    def __ui_action_lookup(self, cmd_vec):
+        f_name = cmd_vec[1]
+        peers_with_file = self.__search_file(cmd_vec)
+        if not peers_with_file:
+            resp_print = """
+            This file is not available in the other registered peers.                    
+            """
+            self.__block_print(resp_print)
+            return True
+        else:
+            l_str = "" if len(peers_with_file) == 1 else "-%d" % len(peers_with_file) 
+            print("Select amongst these peers [1%s]" % l_str)
+            for i, peer in enumerate(peers_with_file):
+                num = i+1
+                peer_str = "%s:%s" % (peer['addr'], peer['port'])
+                print("{:<4}{:<50}".format("[%d]" % num, peer_str))
+            while True:
+                sys.stdout.write("Choice: ")
+                raw_inp = raw_input()
+                user_choice = int(raw_inp)
+                if user_choice > len(peers_with_file) or user_choice < 1:
+                    self.__block_print("Error in your choice. The value you entered is either invalid.")
                 else:
-                    l_str = "" if len(peers_with_file) == 1 else "-%d" % len(peers_with_file) 
-                    print("Select amongst these peers [1%s]" % l_str)
-                    for i, peer in enumerate(peers_with_file):
-                        num = i+1
-                        print("{:<4}{:<50}".format("[%d]" % num, str(peer)))
-                    while True:
-                        sys.stdout.write("Choice: ")
-                        raw_inp = raw_input()
-                        try:
-                            user_choice = int(raw_inp)
-                            if user_choice > len(peers_with_file) or user_choice < 1:
-                                raise ValueError('')
-                        except ValueError as e:
-                            self.__block_print("Error in your choice. The value you entered is either invalid.")
-                        break
-                    actual_idx = user_choice - 1
-                    choosen_peerid = peers_with_file[actual_idx]
-                    self.idxserv_msg_exch.send("get_peer %d" % choosen_peerid, ack=True)
-                    choosen_peer = self.idxserv_msg_exch.pkl_recv()
-                    if choosen_peer is None:
-                        logger.error("Request to get peer %d informations has failed." % choosen_peerid)
-                        return True
-                    else:
-                        # Establish connection to the peer to obtain file
-                        conn_param = (choosen_peer['addr'], choosen_peer['port'])
-                        fs_peer_so = socket(AF_INET, SOCK_STREAM)
-                        fs_peer_so.connect(conn_param)
-                        fs_msg_exch = proto.MessageExchanger(fs_peer_so)
+                    break
+            actual_idx = user_choice - 1
+            choosen_peer = peers_with_file[actual_idx]
 
-                        ack = fs_msg_exch.send("obtain %s" % f_name, ack=True)
-                        if not ack:
-                            logger.error("Problem when sending message to peer.")
-                            return True
-                        fs_msg_exch.send_dummy()
-                        f_size = fs_msg_exch.pkl_recv()
-                        f_size_str = format_filesize(f_size)
+            # Establish connection to the peer to obtain file
+            conn_param = (choosen_peer['addr'], choosen_peer['port'])
+            fs_peer_so = socket(AF_INET, SOCK_STREAM)
+            fs_peer_so.connect(conn_param)
+            fs_msg_exch = proto.MessageExchanger(fs_peer_so)
+            
+            ack = fs_msg_exch.send("obtain %s" % f_name, ack=True)
+            if not ack:
+                logger.error("Problem when sending message to peer.")
+                return True
+            fs_msg_exch.send_dummy()
+            f_size = fs_msg_exch.pkl_recv()
+            f_size_str = format_filesize(f_size)
 
-                        sys.stdout.write("Download %s of size %s? [Y/n] " % (f_name, f_size_str))
-                        raw_inp = raw_input()
-                        user_choice = False if raw_inp.lower() == 'n' else True
-                        if user_choice:
-                            fs_msg_exch.send_ack()
-                            f_fullpath = os.path.join(self.download_dir, f_name)
-                            fs_msg_exch.file_recv(f_fullpath, f_size)
-                            print("File received and stored locally.")
-                        else:
-                            fs_msg_exch.send_err()
-                            print("Abort file transfer.")
+            sys.stdout.write("Download %s of size %s? [Y/n] " % (f_name, f_size_str))
+            raw_inp = raw_input()
+            user_choice = False if raw_inp.lower() == 'n' else True
+            if user_choice:
+                fs_msg_exch.send_ack()
+                f_fullpath = os.path.join(self.download_dir, f_name)
+                fs_msg_exch.file_recv(f_fullpath, f_size)
+                print("File received and stored locally.")
+            else:
+                fs_msg_exch.send_err()
+                print("Abort file transfer.")
         return True
     
     def __ui_action_register(self, cmd_vec):
@@ -249,8 +254,9 @@ class Peer:
     def __ui_display_help(self):
         help_ui = {
             'exit': 'Shut down this peer.',
-            'lookup': 'Ask the indexing server for the lists of other peers that have a given file.',
-            'register': 'Register to the indexing server.',
+            'lookup': 'Request the indexing server for the lists of other peers that have a given file and give the choice to the user to download the file from a peer.',
+            'search': 'Only request the indexing server for the lists of other peers having that file',
+            'register': 'Register files to the indexing server.',
             'list': 'List all the available files in the indexing server.',
             'help': 'Display the help screen.',
             'getid': 'Return the peer id.'
@@ -330,6 +336,8 @@ class Peer:
                 pass
             else:
                 raise
+        finally:
+            self.ui_running = False
         return False
 
     def __run_ui(self):
@@ -369,6 +377,7 @@ class Peer:
                 else:
                     retval = self.ui_actions[cmd_action](cmd_vec)
             except KeyboardInterrupt as e:
+                sys.stderr.write("\r\n")
                 pass
 
     def run(self):
