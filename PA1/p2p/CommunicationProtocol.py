@@ -83,16 +83,27 @@ class MessageExchanger:
                 self.sock.send(data)
         self.sock.send(END_MSG)
 
-    def file_recv(self, f_name):
+    def file_recv(self, f_name, f_size=None):
         logger.debug("RECV FILE " + f_name)
         l = len(END_MSG)
+
+        total_size = 0
+        sys.stdout.write("Downloading file...")
         with open(f_name, "wb") as out_f:
             while True:
-                sys.stdout.write(".")
                 shard = self.sock.recv(BUFFER_SIZE)
+                total_size += sys.getsizeof(shard)
+                if f_size is None:
+                    sys.stdout.write("\rDownloading file... %d bytes" % total_size)
+                    # print downloaded size
+                    pass
+                else:
+                    # print percentage downloaded
+                    perc = int(100.*total_size/f_size)
+                    sys.stdout.write("\rDownloading file... %3d%%" % perc)
                 if shard[-l:] == END_MSG:
                     out_f.write(shard[:-l])
                     break
                 else:
                     out_f.write(shard)
-            
+        print
