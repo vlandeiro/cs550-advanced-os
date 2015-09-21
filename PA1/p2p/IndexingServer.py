@@ -105,6 +105,7 @@ class IndexingServer:
             peers_list.add(peerid)
             self.file2peers[f_name] = peers_list
             msg_exch.send_ack()
+        msg_exch.send_ack()
         return True
 
     def __action_list(self, msg_exch, cmd_vec):
