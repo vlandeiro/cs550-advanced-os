@@ -175,23 +175,24 @@ class Peer:
             peers_with_file = self.__search_file(search_cmd_vec)
             if peers_with_file:
                 other_peers_file.append(f_name)
-        
+
         # build new vector of command
-        new_cmd_vec = cmd_vec[1:2] + cmd_vec[3:]
+        new_cmd_vec = [cmd_vec[1]]
 
         # build list of random files for lookup/search benchmark
-        query_files = sample_with_replacement(other_peers_file, nb_loops)
-        if query_files and bench_cmd in ['lookup', 'search']:
+        if not other_peers_file and bench_cmd in ['lookup', 'search']:
             self.__block_print("There are no file in the other peers.")
             return True
+        query_files = sample_with_replacement(other_peers_file, nb_loops)
 
         # Start time and run loop of actions
         t0 = time.time()
         for i in range(nb_loops):
             # add file to cmd when benchmarking search/lookup
             if bench_cmd in ['lookup', 'search']:
-                new_cmd_vec.append(query_files[i])
-            results = benchmark_actions[bench_cmd](new_cmd_vec)
+                results = benchmark_actions[bench_cmd](new_cmd_vec + [query_files[i]])
+            else:
+                results = benchmark_actions[bench_cmd](new_cmd_vec)
         t1 = time.time()
         delta = t1-t0
         avg_delta = delta*1000./nb_loops
