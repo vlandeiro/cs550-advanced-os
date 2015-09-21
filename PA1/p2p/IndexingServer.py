@@ -157,7 +157,7 @@ class IndexingServer:
 
         """
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
-        self.listening_socket.bind(("localhost", self.listening_port))
+        self.listening_socket.bind(("0.0.0.0", self.listening_port))
         self.listening_socket.listen(self.pool_size)
         logger.info("Indexing server listening on port %d", self.listening_port)
 
