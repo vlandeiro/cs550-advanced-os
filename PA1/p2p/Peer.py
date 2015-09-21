@@ -122,7 +122,14 @@ class Peer:
     
     def __ui_action_search(self, cmd_vec):
         peers_with_file = self.__search_file(cmd_vec)
-        self.__IS_print(peers_with_file)
+        if peers_with_file is None:
+            pass
+        elif peers_with_file == []:
+            print("File unavailable in other peers.")
+        else:
+            print("File available at the following peers:")
+            for p in peers_with_file:
+                print("\t- %s:%d" % (p['addr'], p['port']))
         return True
     
     def __ui_action_benchmark_search(self, cmd_vec):
@@ -411,7 +418,8 @@ class Peer:
                 # If invalid command, print error message to user
                 if cmd_action not in self.ui_actions.keys():
                     self.__block_print("Error: unvalid command.")
-                    self.ui_actions['help'](None)
+                    print("Use the help command to get more informations.")
+                    #self.ui_actions['help'](None)
                 # If valid command, execute the matching action
                 else:
                     retval = self.ui_actions[cmd_action](cmd_vec)
