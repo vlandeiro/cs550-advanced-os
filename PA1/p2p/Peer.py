@@ -18,7 +18,7 @@ import time
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 LISTENING_TIMEOUT = 0.2
 
 
@@ -104,12 +104,14 @@ class Peer:
             file to lookup.
             """ % cmd_vec[0]
             self.__block_print(err_lookup)
+            return None
         else:
             cmd_vec[0] = "lookup"
             msg = " ".join(cmd_vec)
             f_name = cmd_vec[1]
             # send lookup message to indexing server
             ack = self.idxserv_msg_exch.send("%s %d" % (msg, id(self)), ack=True)
+            peers_with_file = []
             if not ack:
                 logger.error("Error in communication with indexing server")
                 return None
@@ -124,17 +126,25 @@ class Peer:
         return True
     
     def __ui_action_benchmark_search(self, cmd_vec):
-        if len(cmd_vec) < 2:
+        if len(cmd_vec) < 3:
             err_print = """
             The benchmark command is missing arguments. You must
             indicate the number of loops you want to run.
             """
             self.__block_print(err_print)
             return True
-        nb_loops = int(cmd_vec[1])
+        try:
+            nb_loops = int(cmd_vec[1])
+        except ValueError as e:
+            err_print = """
+            The first argument for benchmark_search must be a number.
+            """
+            self.__block_print(err_print)
+            return True
+        new_cmd_vec = ['lookup', cmd_vec[2]]
         t0 = time.time()
         for i in range(nb_loops):
-            peers_with_file = self.__search_file(cmd_vec)
+            peers_with_file = self.__search_file(new_cmd_vec)
             if peers_with_file is None:
                 logger.info('Request %d failed.' % i)
         t1 = time.time()
@@ -292,7 +302,7 @@ class Peer:
         }
         keys = sorted(help_ui.keys())
         for k in keys:
-            print("{:<15}{:<20}".format(k, help_ui[k]))
+            print("{:<20}{:<20}".format(k, help_ui[k]))
         return True
     
     def __peer_message_handler(self, peer_so, peer_addr):
