@@ -181,7 +181,10 @@ class Peer:
 
         # build list of random files for lookup/search benchmark
         query_files = sample_with_replacement(other_peers_file, nb_loops)
-        
+        if query_files and bench_cmd in ['lookup', 'search']:
+            self.__block_print("There are no file in the other peers.")
+            return True
+
         # Start time and run loop of actions
         t0 = time.time()
         for i in range(nb_loops):
@@ -311,7 +314,7 @@ class Peer:
         self.files_dict = files_dict
             
         poison_pill = None
-        self.idxserv_msg_exch.pkl_send(poison_pill)
+        ack = self.idxserv_msg_exch.pkl_send(poison_pill, ack=True)
         return True
         
     def __ui_action_list(self, cmd_vec):
@@ -473,7 +476,7 @@ class Peer:
                 cmd_action = cmd_vec[0] if len(cmd_vec) >= 1 else ''
                 # If invalid command, print error message to user
                 if cmd_action not in self.ui_actions.keys():
-                    self.__block_print("Error: unvalid command.")
+                    self.__block_print("Error: unvalid command '%s'" % cmd_str)
                     print("Use the help command to get more informations.")
                     #self.ui_actions['help'](None)
                 # If valid command, execute the matching action
@@ -501,8 +504,8 @@ class Peer:
         except EOFError as e:
             print "\nShutting down peer."
         except:
-            raise
             self.__quit_ui()
+            raise
 
 def usage_error():
     print(__doc__.strip())
@@ -519,8 +522,11 @@ def format_filesize(f_size):
     return f_size_str
 
 def sample_with_replacement(l, k):
-    lt = l*k
-    return random.sample(lt, k)
+    if l:
+        lt = l*k
+        return random.sample(lt, k)
+    else:
+        return []
 
 if __name__ == '__main__':
     # parse arguments
