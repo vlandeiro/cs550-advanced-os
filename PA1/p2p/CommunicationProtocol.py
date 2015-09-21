@@ -84,12 +84,13 @@ class MessageExchanger:
                 self.sock.send(data)
         self.sock.send(END_MSG)
 
-    def file_recv(self, f_name, f_size=None):
+    def file_recv(self, f_name, f_size=None, progress=True):
         logger.debug("RECV FILE " + f_name)
         l = len(END_MSG)
 
         total_size = 0
-        sys.stdout.write("Downloading file...")
+        if progress:
+            sys.stdout.write("Downloading file...")
         out_f = os.open(f_name, os.O_WRONLY|os.O_CREAT)
         keep_reading = True
         while keep_reading:
@@ -101,10 +102,13 @@ class MessageExchanger:
                 
             total_size += nb_bytes_written
             if f_size is None:
-                # print downloaded size
-                sys.stdout.write("\rDownloading file... %d bytes" % total_size)
+                if progress:
+                    # print downloaded size
+                    sys.stdout.write("\rDownloading file... %d bytes" % total_size)
             else:
                 # print percentage downloaded
-                perc = int(100.*total_size/f_size)
-                sys.stdout.write("\rDownloading file... %3d%%" % perc)
-        print
+                if progress:
+                    perc = int(100.*total_size/f_size)
+                    sys.stdout.write("\rDownloading file... %3d%%" % perc)
+        if progress:
+            print
