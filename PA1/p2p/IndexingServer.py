@@ -12,11 +12,7 @@ import CommunicationProtocol as proto
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# TODO:
-# - avoid registering of same peer
-# - select folder to output downloaded files
+logger.setLevel(logging.INFO)
 
 class IndexingServer:
     def __init__(self, listening_ip, listening_port, pool_size=10):
@@ -63,7 +59,7 @@ class IndexingServer:
 
     def __action_close_connection(self, msg_exch, cmd_vec):
         peerid = int(cmd_vec[1])
-        logger.debug("Closing connection to peer " + str(peerid))
+        logger.info("Closing connection to peer " + str(peerid))
         
         # remove all files registered by this peer
         if 'files' in self.peers_info[peerid]:
@@ -138,7 +134,7 @@ class IndexingServer:
         return True
     
     def __message_handler(self, client_so, client_addr):
-        logger.debug("Accepted connection from %s", client_addr)
+        logger.info("Accepted connection from %s", client_addr)
         msg_exch = proto.MessageExchanger(client_so)
         
         open_conn = True
@@ -163,7 +159,7 @@ class IndexingServer:
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
         self.listening_socket.bind(("localhost", self.listening_port))
         self.listening_socket.listen(self.pool_size)
-        logger.debug("Indexing server listening on port %d", self.listening_port)
+        logger.info("Indexing server listening on port %d", self.listening_port)
 
         try:
             while True:
