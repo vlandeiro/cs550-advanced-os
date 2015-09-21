@@ -18,7 +18,7 @@ import time
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 LISTENING_TIMEOUT = 0.2
 
 
