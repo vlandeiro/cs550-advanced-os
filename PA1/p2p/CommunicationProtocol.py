@@ -112,4 +112,4 @@ class MessageExchanger:
                     sys.stdout.write("\rDownloading file... %3d%%" % perc)
         if progress:
             print
-        os.close(out_fd)
+        os.close(out_f)
