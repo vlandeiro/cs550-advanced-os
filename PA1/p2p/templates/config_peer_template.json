@@ -4,6 +4,6 @@
     "idxserv_ip": "localhost",
     "idxserv_port": 4000,
     "pool_size": 10,
-    "files_regex": "files_dir/*",
-    "download_dir": "download_dir"
+    "files_regex": "files/u/*",
+    "download_dir": "files/d"
 }
