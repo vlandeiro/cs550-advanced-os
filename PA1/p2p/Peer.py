@@ -57,7 +57,8 @@ class Peer:
             'list': self.__ui_action_list,
             'getid': self.__ui_action_getid,
             'echo': self.__ui_action_echo,
-            'search': self.__ui_action_search
+            'search': self.__ui_action_search,
+            'benchmark_search': self.__ui_action_benchmark_search
         }
 
         self.client_actions = {
@@ -111,7 +112,7 @@ class Peer:
             ack = self.idxserv_msg_exch.send("%s %d" % (msg, id(self)), ack=True)
             if not ack:
                 logger.error("Error in communication with indexing server")
-                return True
+                return None
             else:
                 self.idxserv_msg_exch.send_dummy()
                 peers_with_file = self.idxserv_msg_exch.pkl_recv()
@@ -122,10 +123,36 @@ class Peer:
         self.__IS_print(peers_with_file)
         return True
     
+    def __ui_action_benchmark_search(self, cmd_vec):
+        if len(cmd_vec) < 2:
+            err_print = """
+            The benchmark command is missing arguments. You must
+            indicate the number of loops you want to run.
+            """
+            self.__block_print(err_print)
+            return True
+        nb_loops = int(cmd_vec[1])
+        t0 = time.time()
+        for i in range(nb_loops):
+            peers_with_file = self.__search_file(cmd_vec)
+            if peers_with_file is None:
+                logger.info('Request %d failed.' % i)
+        t1 = time.time()
+        delta = t1-t0
+        avg_delta = delta*1000./nb_loops
+        self.__block_print("Total time: %.2fs\nAverage time: %.2fms" % (delta, avg_delta))
+        return True
+    
     def __ui_action_lookup(self, cmd_vec):
         f_name = cmd_vec[1]
         peers_with_file = self.__search_file(cmd_vec)
-        if not peers_with_file:
+        if peers_with_file is None:
+            resp_print == """
+            Search request failed.
+            """
+            self.__block_print(resp_print)
+            return True
+        elif not peers_with_file:
             resp_print = """
             This file is not available in the other registered peers.                    
             """
@@ -259,7 +286,9 @@ class Peer:
             'register': 'Register files to the indexing server.',
             'list': 'List all the available files in the indexing server.',
             'help': 'Display the help screen.',
-            'getid': 'Return the peer id.'
+            'getid': 'Return the peer id.',
+            'echo': 'Simple function that send a message to the server, wait for the same message and print it.',
+            'benchmark_search': 'Run a given number of sequential search and print the average time for one search request.'
         }
         keys = sorted(help_ui.keys())
         for k in keys:
