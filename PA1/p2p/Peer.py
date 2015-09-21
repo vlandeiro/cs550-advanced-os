@@ -222,7 +222,7 @@ class Peer:
             # Receive file
             fs_msg_exch.send_ack()
             f_fullpath = os.path.join(self.download_dir, f_name)
-            fs_msg_exch.file_recv(f_fullpath, f_size)
+            fs_msg_exch.file_recv(f_fullpath, f_size, progress=False)
         return True
 
     def __ui_action_lookup(self, cmd_vec):
@@ -365,7 +365,7 @@ class Peer:
             'help': 'Display the help screen.',
             'getid': 'Return the peer id.',
             'echo': 'Simple function that send a message to the server, wait for the same message and print it.',
-            'benchmark_search': 'Run a given number of sequential search and print the average time for one search request.'
+            'benchmark': 'Benchmark a function (lookup, search, or register) by running this command N times and averaging the runtime.'
         }
         keys = sorted(help_ui.keys())
         for k in keys:
