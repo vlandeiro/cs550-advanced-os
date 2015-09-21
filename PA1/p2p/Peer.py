@@ -15,6 +15,7 @@ import textwrap
 import os
 import os.path
 import time
+import random
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ class Peer:
             'getid': self.__ui_action_getid,
             'echo': self.__ui_action_echo,
             'search': self.__ui_action_search,
-            'benchmark_search': self.__ui_action_benchmark_search
+            'benchmark': self.__ui_action_benchmark
         }
 
         self.client_actions = {
@@ -97,6 +98,15 @@ class Peer:
         self.__quit_ui()
         return False
 
+    def __list_file(self):
+        ack = self.idxserv_msg_exch.send('list', ack=True)
+        if not ack:
+            logger.error("Error in communication with indexing server.")
+            return True
+        self.idxserv_msg_exch.send_dummy()
+        file_list = self.idxserv_msg_exch.pkl_recv()
+        return file_list
+    
     def __search_file(self, cmd_vec):
         if len(cmd_vec) != 2:
             err_lookup = """
@@ -132,34 +142,85 @@ class Peer:
                 print("\t- %s:%d" % (p['addr'], p['port']))
         return True
     
-    def __ui_action_benchmark_search(self, cmd_vec):
+    def __ui_action_benchmark(self, cmd_vec):
+        # dictionary of possible actions to benchmark
+        benchmark_actions = {
+            'search': self.__search_file,
+            'lookup': self.__lookup_no_ui,
+            'register': self.__ui_action_register
+        }
+        # parse benchmark command
         if len(cmd_vec) < 3:
             err_print = """
-            The benchmark command is missing arguments. You must
-            indicate the number of loops you want to run.
+            The benchmark command is missing arguments. You must indicate the
+            command you want to run, followed by the number of loops.
             """
             self.__block_print(err_print)
             return True
+        bench_cmd = cmd_vec[1]
         try:
-            nb_loops = int(cmd_vec[1])
+            nb_loops = int(cmd_vec[2])
         except ValueError as e:
             err_print = """
             The first argument for benchmark_search must be a number.
             """
             self.__block_print(err_print)
             return True
-        new_cmd_vec = ['lookup', cmd_vec[2]]
+
+        # get all available files in other peers in case of a lookup/search benchmark
+        file_list = self.__list_file()
+        other_peers_file = []
+        for f_name, f_size, f_path in file_list:
+            search_cmd_vec = ['search', f_name]
+            peers_with_file = self.__search_file(search_cmd_vec)
+            if peers_with_file:
+                other_peers_file.append(f_name)
+        
+        # build new vector of command
+        new_cmd_vec = cmd_vec[1:2] + cmd_vec[3:]
+
+        # build list of random files for lookup/search benchmark
+        query_files = sample_with_replacement(other_peers_file, nb_loops)
+        
+        # Start time and run loop of actions
         t0 = time.time()
         for i in range(nb_loops):
-            peers_with_file = self.__search_file(new_cmd_vec)
-            if peers_with_file is None:
-                logger.info('Request %d failed.' % i)
+            # add file to cmd when benchmarking search/lookup
+            if bench_cmd in ['lookup', 'search']:
+                new_cmd_vec.append(query_files[i])
+            results = benchmark_actions[bench_cmd](new_cmd_vec)
         t1 = time.time()
         delta = t1-t0
         avg_delta = delta*1000./nb_loops
         self.__block_print("Total time: %.2fs\nAverage time: %.2fms" % (delta, avg_delta))
         return True
-    
+
+    def __lookup_no_ui(self, cmd_vec):
+        f_name = cmd_vec[1]
+        peers_with_file = self.__search_file(cmd_vec)
+        if peers_with_file:
+            actual_idx = 0
+            choosen_peer = peers_with_file[actual_idx]
+
+            # Establish connection to the peer to obtain file
+            conn_param = (choosen_peer['addr'], choosen_peer['port'])
+            fs_peer_so = socket(AF_INET, SOCK_STREAM)
+            fs_peer_so.connect(conn_param)
+            fs_msg_exch = proto.MessageExchanger(fs_peer_so)
+            
+            ack = fs_msg_exch.send("obtain %s" % f_name, ack=True)
+            if not ack:
+                logger.error("Problem when sending message to peer.")
+                return True
+            fs_msg_exch.send_dummy()
+            # Get file size
+            f_size = fs_msg_exch.pkl_recv()
+            # Receive file
+            fs_msg_exch.send_ack()
+            f_fullpath = os.path.join(self.download_dir, f_name)
+            fs_msg_exch.file_recv(f_fullpath, f_size)
+        return True
+
     def __ui_action_lookup(self, cmd_vec):
         f_name = cmd_vec[1]
         peers_with_file = self.__search_file(cmd_vec)
@@ -254,12 +315,7 @@ class Peer:
         return True
         
     def __ui_action_list(self, cmd_vec):
-        ack = self.idxserv_msg_exch.send('list', ack=True)
-        if not ack:
-            logger.error("Error in communication with indexing server.")
-            return True
-        self.idxserv_msg_exch.send_dummy()
-        file_list = self.idxserv_msg_exch.pkl_recv()
+        file_list = self.__list_file()
         if not file_list:
             print("There is no file available on the Indexing Server.")
         else:
@@ -461,6 +517,10 @@ def format_filesize(f_size):
         f_size = 1.*f_size/1024.
     f_size_str = "%.1f%sB" % (f_size, prefix)
     return f_size_str
+
+def sample_with_replacement(l, k):
+    lt = l*k
+    return random.sample(lt, k)
 
 if __name__ == '__main__':
     # parse arguments
