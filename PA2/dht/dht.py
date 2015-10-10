@@ -1,12 +1,14 @@
 import json
 import sys
 import logging
+import os
+import time
 
 from urllib2 import urlopen
 from hashlib import md5
 from dht_client import DHTClient
 from dht_server import DHTServer
-from multiprocessing import Manager
+from multiprocessing import Manager, Value
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -29,6 +31,9 @@ class DHT:
 
         self.manager = Manager()
         self.hashmap = self.manager.dict()
+
+        self.stdin = os.fdopen(os.dup(sys.stdin.fileno()))
+        self.terminate = Value('i', 0)
         
         self.server = DHTServer(self)
         self.client = DHTClient(self)
@@ -40,7 +45,7 @@ class DHT:
     def get(self, key):
         return self.hashmap.get(key)
 
-    def del(self, key):
+    def rem(self, key):
         del self.hashmap[key]
         return True
 
@@ -62,5 +67,10 @@ if __name__ == '__main__':
         peers_map = {int(id): peers_map[id] for id in peers_map}
         print peers_map
     dht_node = DHT(peers_map)
-    dht_node.server.start()
-    dht_node.client.start()
+    try:
+        dht_node.server.start()
+        time.sleep(1)
+        dht_node.client.run()
+        dht_node.server.join()
+    except KeyboardInterrupt as e:
+        sys.stderr.write("KeyboardInterrupt")
