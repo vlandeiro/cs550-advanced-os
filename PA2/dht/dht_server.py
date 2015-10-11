@@ -46,7 +46,13 @@ class DHTServer(Process):
             exch = MessageExchanger(sock)
 
             while True:
-                readable, _, _ = select([sock], [], [], 0.1)
+                try:
+                    readable, _, _ = select([sock], [], [], 0.1)
+                except error:
+                    sock.shutdown(2)
+                    sock.close()
+                    self.socket_list.remove(sock)
+                    break
                 if readable:
                     cmd = exch.recv()
                     cmd_vec = cmd.split()
