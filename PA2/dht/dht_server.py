@@ -22,7 +22,7 @@ class DHTServer(Process):
         self.actions_list = {
             "put": self.__put,
             "get": self.__get,
-            "del": self.__del
+            "rem": self.__del
         }
         self.socket_list = []
 
