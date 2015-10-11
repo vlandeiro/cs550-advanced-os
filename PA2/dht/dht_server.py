@@ -57,7 +57,10 @@ class DHTServer(Process):
                         exch.send(py2str[None])
                     else:
                         res = self.actions_list[action](*args)
-                        exch.send(py2str[res])
+                        if res in py2str:
+                            exch.send(py2str[res])
+                        else:
+                            exch.send(res)
                 if self.dht.terminate.value == 1:
                     break
         except KeyboardInterrupt as e:

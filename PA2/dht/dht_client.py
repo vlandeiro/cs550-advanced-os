@@ -40,8 +40,11 @@ class DHTClient(Process):
                 action = cmd_vec[0] if cmd_vec else ''
                 args = cmd_vec[1:]
                 if action in self.actions_list:
-                    stop, res = self.actions_list[action](*args)
-                    sys.stdout.write("RET> %s\n" % (repr(res)))
+                    try:
+                        stop, res = self.actions_list[action](*args)
+                        sys.stdout.write("RET> %s\n" % (repr(res)))
+                    except TypeError as t:
+                        sys.stderr.write("ERR> Wrong number of arguments.")
                 
             except KeyboardInterrupt as e:
                 sys.stderr.write("\r\n")
