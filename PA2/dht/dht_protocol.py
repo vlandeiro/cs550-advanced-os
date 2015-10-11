@@ -21,7 +21,7 @@ class MessageExchanger:
         msg = struct.pack('>I', len(msg)) + msg
         self.sock.sendall(msg)
 
-    def recv():
+    def recv(self):
         # get message length
         raw_msglen = self.recvall(sock, 4)
         if not raw_msglen:
@@ -30,7 +30,7 @@ class MessageExchanger:
         # get message
         return recvall(msglen)
 
-    def recvall(n):
+    def recvall(self, n):
         # Helper function to recv n bytes or return None if EOF is hit
         data = ''
         while len(data) < n:
