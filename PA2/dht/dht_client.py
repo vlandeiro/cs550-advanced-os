@@ -65,7 +65,7 @@ class DHTClient(Process):
             sock = self.__get_peer_sock(server_id)
             exch = MessageExchanger(sock)
             exch.send("%s %s" % (action, " ".join(args)))
-            res = str2py(exch.recv())
+            res = str2py[exch.recv()]
         return False, res
         
     def __put(self, key, value):
