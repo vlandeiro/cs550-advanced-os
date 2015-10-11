@@ -55,6 +55,8 @@ class DHTServer(Process):
                     break
                 if readable:
                     cmd = exch.recv()
+                    if cmd is None:
+                        continue
                     cmd_vec = cmd.split()
                     action = cmd_vec[0]
                     args = cmd_vec[1:]
