@@ -1,10 +1,12 @@
 import json
 import logging
 import sys
+import time
 
 from multiprocessing import Process
 from dht_protocol import *
 from socket import *
+from collections import Counter
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -14,13 +16,23 @@ class DHTClient(Process):
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.DEBUG)
-
         self.dht = dht
-        # keep map of sockets connected with peers, init connection at first client request
+
+        # load key/val data for benchmark
+        self.logger("Loading data in memory for the benchmark...")
+        self.data = {}
+        with open("keyval.data") as data_fd:
+            for line in data_fd:
+                k, v = line.strip().split()
+                self.data[k] = v
+        self.logger("Benchmark data successfully loaded.")
+        # keep map of sockets connected with peers
+        # init connection at first client request
         self.actions_list = {
             "put": self.__put,
             "get": self.__get,
             "del": self.__del,
+            "benchmark": self.__benchmark,
             "exit": self.__exit,
         }
         self.socket_map = {}
@@ -42,9 +54,8 @@ class DHTClient(Process):
                 if action in self.actions_list:
                     try:
                         stop, res = self.actions_list[action](*args)
-                        sys.stdout.write("RET> %s\n" % (repr(res)))
                     except TypeError as t:
-                        sys.stderr.write("ERR> Wrong number of arguments.")
+                        sys.stdout.write("ERR> Wrong number of arguments.\n")
                 
             except KeyboardInterrupt as e:
                 sys.stderr.write("\r\n")
@@ -72,7 +83,27 @@ class DHTClient(Process):
             if res in str2py:
                 res = str2py[res]
         return False, res
-        
+
+    def __benchmark(self, cmd_vec):
+        # benchmark action first_key count
+        action, first_key, count = cmd_vec
+        first_key = int(first_key)
+        count = int(count)
+        results = []
+        t0 = time.time()
+        for k in range(first_key, first_key+count+1):
+            k = str(k)
+            if action == "put":
+                args = [k, self.data[k]]
+            else:
+                args = [k]
+            _ res = get_attr("__" + action, k, args)
+            results.append(res)
+        t1 = time.time()
+        delta = t1 - t0
+        self.logger.info("%d %s operations completed in %.3f seconds." % (count, action, delta))
+        self.logger.info("Results: %s" % (Counter(results).most_common(2)))
+    
     def __put(self, key, value):
         self.logger.debug("put")
         return self.__generic_action("put", key, [key, value])
