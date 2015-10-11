@@ -28,7 +28,7 @@ class MessageExchanger:
             return None
         msglen = struct.unpack('>I', raw_msglen)[0]
         # get message
-        return recvall(msglen)
+        return self.recvall(msglen)
 
     def recvall(self, n):
         # Helper function to recv n bytes or return None if EOF is hit
