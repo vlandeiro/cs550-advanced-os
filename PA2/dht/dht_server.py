@@ -32,7 +32,7 @@ class DHTServer(Process):
 
     def __get(self, key):
         self.logger.debug("get")
-        return self.dht.put(key)
+        return self.dht.get(key)
 
     def __del(self, key):
         self.logger.debug("del")
