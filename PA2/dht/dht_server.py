@@ -14,31 +14,33 @@ class DHTServer(Process):
         super(DHTServer, self).__init__()
 
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.INFO)
 
         self.dht = dht
         self.listening_socket = None
         
         self.actions_list = {
-            "put": self.__put,
-            "get": self.__get,
-            "rem": self.__del
+            "put": self._put,
+            "get": self._get,
+            "rem": self._del
         }
         self.socket_list = []
 
-    def __put(self, key, value):
+    def _put(self, key, value):
         self.logger.debug("put")
-        return self.dht.put(key, value)
+        self.dht.put(key, value)
+        return True
 
-    def __get(self, key):
+    def _get(self, key):
         self.logger.debug("get")
         return self.dht.get(key)
 
-    def __del(self, key):
+    def _del(self, key):
         self.logger.debug("del")
-        return self.dht.rem(key)
+        self.dht.rem(key)
+        return True
     
-    def __message_handler(self, sock, addr):
+    def _message_handler(self, sock, addr):
         try:
             sock.setblocking(0)
             self.socket_list.append(sock)
@@ -90,7 +92,7 @@ class DHTServer(Process):
                     break
                 elif readable:
                     in_sock, in_addr = self.listening_socket.accept()
-                    handler = Process(target=self.__message_handler, args=(in_sock, in_addr))
+                    handler = Process(target=self._message_handler, args=(in_sock, in_addr))
                     handler.daemon = True
                     handler.start()
         except KeyboardInterrupt:

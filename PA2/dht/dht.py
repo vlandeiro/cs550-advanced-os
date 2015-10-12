@@ -63,9 +63,7 @@ if __name__ == '__main__':
         sys.exit(1)
     with open(args[1], 'r') as config_fd:
         peers_map = json.load(config_fd)
-        print peers_map
         peers_map = {int(id): peers_map[id] for id in peers_map}
-        print peers_map
     dht_node = DHT(peers_map)
     try:
         dht_node.server.start()

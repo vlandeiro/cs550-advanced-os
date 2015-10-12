@@ -15,30 +15,30 @@ class DHTClient(Process):
         super(DHTClient, self).__init__()
 
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.INFO)
         self.dht = dht
 
         # load key/val data for benchmark
-        self.logger("Loading data in memory for the benchmark...")
+        self.logger.info("Loading data in memory for the benchmark...")
         self.data = {}
         with open("keyval.data") as data_fd:
             for line in data_fd:
-                k, v = line.strip().split()
+                k, v = line.split()
                 self.data[k] = v
-        self.logger("Benchmark data successfully loaded.")
+        self.logger.info("Benchmark data successfully loaded.")
         # keep map of sockets connected with peers
         # init connection at first client request
         self.actions_list = {
-            "put": self.__put,
-            "get": self.__get,
-            "del": self.__del,
-            "benchmark": self.__benchmark,
-            "exit": self.__exit,
+            "put": self._put,
+            "get": self._get,
+            "del": self._del,
+            "benchmark": self._benchmark,
+            "exit": self._exit,
         }
         self.socket_map = {}
 
     def run(self):
-        self.logger.debug('Starting DHT client.')
+        self.logger.info('Starting DHT client.')
 
         stop = False
         while not stop:
@@ -55,12 +55,11 @@ class DHTClient(Process):
                     try:
                         stop, res = self.actions_list[action](*args)
                     except TypeError as t:
-                        sys.stdout.write("ERR> Wrong number of arguments.\n")
-                
+                        self.logger.error(repr(t))
             except KeyboardInterrupt as e:
                 sys.stderr.write("\r\n")
 
-    def __get_peer_sock(self, server_id):
+    def _get_peer_sock(self, server_id):
         if server_id not in self.socket_map:
             sock = socket(AF_INET, SOCK_STREAM)
             peer = self.dht.peers_map[server_id]
@@ -68,7 +67,7 @@ class DHTClient(Process):
             self.socket_map[server_id] = sock
         return self.socket_map[server_id]
 
-    def __generic_action(self, action, key, args):
+    def _generic_action(self, action, key, args):
         # hash key to get the server id
         server_id = self.dht.server_hash(key)
         # if local call parent, else call or connect to server
@@ -76,7 +75,7 @@ class DHTClient(Process):
             method = getattr(self.dht, action)
             res = method(*args)
         else:
-            sock = self.__get_peer_sock(server_id)
+            sock = self._get_peer_sock(server_id)
             exch = MessageExchanger(sock)
             exch.send("%s %s" % (action, " ".join(args)))
             res = exch.recv()
@@ -84,39 +83,42 @@ class DHTClient(Process):
                 res = str2py[res]
         return False, res
 
-    def __benchmark(self, cmd_vec):
+    def _benchmark(self, action, first_key, count):
         # benchmark action first_key count
-        action, first_key, count = cmd_vec
         first_key = int(first_key)
         count = int(count)
         results = []
         t0 = time.time()
-        for k in range(first_key, first_key+count+1):
+        for k in range(first_key, first_key+count):
             k = str(k)
             if action == "put":
                 args = [k, self.data[k]]
             else:
                 args = [k]
-            _ res = get_attr("__" + action, k, args)
-            results.append(res)
+            func = getattr(self, "_" + action)
+            _, ret = func(*args)
+            results.append(ret)
         t1 = time.time()
         delta = t1 - t0
         self.logger.info("%d %s operations completed in %.3f seconds." % (count, action, delta))
-        self.logger.info("Results: %s" % (Counter(results).most_common(2)))
+        results = [True if i != None and i != False else False for i in results]
+        self.logger.info("Results: %s" % (repr(Counter(results).most_common(2))))
+        return False, None
+
     
-    def __put(self, key, value):
+    def _put(self, key, value):
         self.logger.debug("put")
-        return self.__generic_action("put", key, [key, value])
+        return self._generic_action("put", key, [key, value])
     
-    def __get(self, key):
+    def _get(self, key):
         self.logger.debug("get")
-        return self.__generic_action("get", key, [key])
+        return self._generic_action("get", key, [key])
 
-    def __del(self, key):
+    def _del(self, key):
         self.logger.debug("del")
-        return self.__generic_action("rem", key, [key])
+        return self._generic_action("rem", key, [key])
 
-    def __exit(self):
+    def _exit(self):
         self.logger.debug("exit")
         self.dht.terminate.value = 1
         return True, None
