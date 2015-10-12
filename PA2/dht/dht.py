@@ -8,7 +8,7 @@ from urllib2 import urlopen
 from hashlib import md5
 from dht_client import DHTClient
 from dht_server import DHTServer
-from multiprocessing import Manager, Value
+from multiprocessing import Manager, Value, Lock
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -31,6 +31,7 @@ class DHT:
 
         self.manager = Manager()
         self.hashmap = self.manager.dict()
+        self.map_lock = self.manager.Lock()
 
         self.stdin = os.fdopen(os.dup(sys.stdin.fileno()))
         self.terminate = Value('i', 0)
@@ -39,14 +40,21 @@ class DHT:
         self.client = DHTClient(self)
 
     def put(self, key, value):
+        self.map_lock.acquire()
         self.hashmap[key] = value
+        self.map_lock.release()
         return True
 
     def get(self, key):
-        return self.hashmap.get(key)
+        self.map_lock.acquire()
+        val = self.hashmap.get(key)
+        self.map_lock.release()
+        return val
 
     def rem(self, key):
+        self.map_lock.acquire()
         del self.hashmap[key]
+        self.map_lock.release()
         return True
 
     def server_hash(self, key):
