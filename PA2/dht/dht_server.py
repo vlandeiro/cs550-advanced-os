@@ -14,7 +14,7 @@ class DHTServer(Process):
         super(DHTServer, self).__init__()
 
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.INFO)
 
         self.dht = dht
         self.listening_socket = None
