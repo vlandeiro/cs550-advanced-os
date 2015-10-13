@@ -40,24 +40,28 @@ class DHT:
         self.client = DHTClient(self)
 
     def put(self, key, value):
+        """Fill the hashmap with a key and value."""
         self.map_lock.acquire()
         self.hashmap[key] = value
         self.map_lock.release()
         return True
 
     def get(self, key):
+        """Get value of a given key."""
         self.map_lock.acquire()
         val = self.hashmap.get(key)
         self.map_lock.release()
         return val
 
     def rem(self, key):
+        """Delete entry in the hashmap."""
         self.map_lock.acquire()
         del self.hashmap[key]
         self.map_lock.release()
         return True
 
     def server_hash(self, key):
+        """Return the peer id to contact given a key."""
         return int(md5(key).hexdigest(), 16) % self.peers_count
 
 
