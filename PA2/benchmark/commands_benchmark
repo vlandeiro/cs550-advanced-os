@@ -1,0 +1,26 @@
+benchmark put 100000 100000
+benchmark put 200000 100000
+benchmark put 300000 100000
+benchmark put 400000 100000
+benchmark put 500000 100000
+benchmark put 600000 100000
+benchmark put 700000 100000
+benchmark put 800000 100000
+
+benchmark get 100000 100000
+benchmark get 200000 100000
+benchmark get 300000 100000
+benchmark get 400000 100000
+benchmark get 500000 100000
+benchmark get 600000 100000
+benchmark get 700000 100000
+benchmark get 800000 100000
+
+benchmark del 100000 100000
+benchmark del 200000 100000
+benchmark del 300000 100000
+benchmark del 400000 100000
+benchmark del 500000 100000
+benchmark del 600000 100000
+benchmark del 700000 100000
+benchmark del 800000 100000
