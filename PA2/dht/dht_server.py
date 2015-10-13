@@ -62,6 +62,7 @@ class DHTServer(Process):
                     cmd_vec = cmd.split()
                     action = cmd_vec[0]
                     args = cmd_vec[1:]
+                    self.logger.debug("Request %s received." % (cmd))
 
                     if action not in self.actions_list:
                         exch.send(py2str[None])
@@ -77,12 +78,12 @@ class DHTServer(Process):
             self.dht.terminate.value = 1
     
     def run(self):
-        self.logger.debug('Starting DHT server.')
+        self.logger.info('Starting DHT server.')
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
         self.listening_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.listening_socket.bind(("0.0.0.0", self.dht.port))
         self.listening_socket.listen(self.dht.peers_count)
-        self.logger.debug("DHT server listening on port %d", self.dht.port)
+        self.logger.info("DHT server listening on port %d." % (self.dht.port))
 
         read_list = [self.listening_socket]
         try:
