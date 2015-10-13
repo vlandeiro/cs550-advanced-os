@@ -68,6 +68,7 @@ def print_usage(args):
     sys.stderr.write("Usage: python %s config.json\n" % args[0])
 
 if __name__ == '__main__':
+    args = sys.argv()
     if len(args) != 2:
         print_usage(args)
         sys.exit(1)
