@@ -45,7 +45,7 @@ class DHTClient(Process):
             try:
                 # Getting user input
                 cmd = raw_input("$> ")
-                
+
                 # cmd = self.dht.stdin.readline()
                 cmd_vec = cmd.strip().split()
 
@@ -114,11 +114,11 @@ class DHTClient(Process):
         self.logger.info("%d %s operations completed in %.3f seconds." % (count, action, delta))
         return False, None
 
-    
+
     def _put(self, key, value):
         self.logger.debug("put")
         return self._generic_action("put", key, [key, value])
-    
+
     def _get(self, key):
         self.logger.debug("get")
         return self._generic_action("get", key, [key])
@@ -131,4 +131,3 @@ class DHTClient(Process):
         self.logger.debug("exit")
         self.dht.terminate.value = 1
         return True, None
-        

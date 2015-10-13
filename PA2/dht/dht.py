@@ -16,10 +16,10 @@ class DHT:
     def __init__(self, peers_map):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.DEBUG)
-        
+
         self.peers_map = peers_map
         self.peers_count = len(peers_map)
-        
+
         # get this server info from config file
         this_ip = str(json.load(urlopen('https://api.ipify.org/?format=json'))['ip'])
         this_server = filter(lambda s: s[1]['ip'] == this_ip, self.peers_map.iteritems())
@@ -33,9 +33,8 @@ class DHT:
         self.hashmap = self.manager.dict()
         self.map_lock = self.manager.Lock()
 
-        self.stdin = os.fdopen(os.dup(sys.stdin.fileno()))
         self.terminate = Value('i', 0)
-        
+
         self.server = DHTServer(self)
         self.client = DHTClient(self)
 
@@ -67,9 +66,8 @@ class DHT:
 
 def print_usage(args):
     sys.stderr.write("Usage: python %s config.json\n" % args[0])
-    
+
 if __name__ == '__main__':
-    args = sys.argv
     if len(args) != 2:
         print_usage(args)
         sys.exit(1)
