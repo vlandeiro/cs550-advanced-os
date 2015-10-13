@@ -47,7 +47,7 @@ class DHTClient(Process):
                 cmd = raw_input("$> ")
                 
                 # cmd = self.dht.stdin.readline()
-                cmd_vec = cmd.split()
+                cmd_vec = cmd.strip().split()
 
                 action = cmd_vec[0] if cmd_vec else ''
                 args = cmd_vec[1:]
