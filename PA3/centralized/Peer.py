@@ -4,49 +4,20 @@ Usage:
  """
 from multiprocessing import Process, Manager, Queue, Value
 from socket import *
+from CommunicationProtocol import MessageExchanger
 
 import logging
 import json
 import sys
 import errno
-import CommunicationProtocol as proto
-import glob
-import textwrap
 import os
-import os.path
 import time
 import random
 
 logging.basicConfig(level=logging.DEBUG)
-LISTENING_TIMEOUT = 0.2
-
-class PeerServer(Process):
-    def __init__(self, parent):
-        super(PeerServer, self).__init__()
-
-        self.parent = parent
-        self.socket = None
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.INFO)
-        self.actions = {
-            'obtain': self._action_obtain
-        }
-
-    def _action_obtain(self, msg_exch, cmd_vec):
-        f_req = cmd_vec[1]
-        files_dict = self.parent.files_dict
-        self.logger.debug("FILES DICT KEYS: " + str(files_dict.keys()))
-        if f_req in files_dict:
-            f_name, f_size, f_path = files_dict[f_req]
-            return msg_exch.file_send(f_path)
-        return False
-
-    def run(self):
-        pass
     
 class Peer:
-    def __init__(self, listening_ip, listening_port, idxserv_ip, idxserv_port,
-                 pool_size=10, download_dir="./"):
+    def __init__(self, config):
         self.download_dir = os.path.abspath(download_dir)
         if not os.path.isdir(self.download_dir):
             raise ValueError("Download directory does not exist")
@@ -60,30 +31,6 @@ class Peer:
         self.files_dict = self.manager.dict()
         self.terminate = Value('i', 0)
     
-    def _init_connection(self):
-        idx_action = dict(
-            type='init',
-            addr=self.ip,
-            port=self.port
-        )
-        self.idxserv_exch.pkl_send(idx_action)
-        return True
-    
-    def __peer_message_handler(self, peer_so, peer_addr):
-        logger.debug("Accepted connection from %s", peer_addr)
-        fc_msg_exch = proto.MessageExchanger(peer_so)
-
-        open_conn = True
-        while open_conn:
-            msg = fc_msg_exch.recv()
-            cmd_vec = msg.split()
-            action = cmd_vec[0]
-            if action not in self.client_actions:
-                fc_msg_exch.send_err()
-            else:
-                fc_msg_exch.send_ack()
-                open_conn = self.client_actions[action](fc_msg_exch, cmd_vec)
-        peer_so.close()
 
     def __quit_server(self):
         if self.listening_socket is not None:
@@ -96,7 +43,7 @@ class Peer:
         
         """
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
-        self.listening_socket.settimeout(LISTENING_TIMEOUT)
+        #self.listening_socket.settimeout(LISTENING_TIMEOUT)
         self.listening_socket.bind(("0.0.0.0", self.listening_port))
         self.listening_socket.listen(self.pool_size)
         logger.debug("Peer server listening on port %d", self.listening_port)

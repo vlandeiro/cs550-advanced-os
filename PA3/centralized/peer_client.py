@@ -1,3 +1,14 @@
+import logging
+import os
+import errno
+import time
+import sys
+
+from socket import *
+from CommunicationProtocol import MessageExchanger
+
+logging.basicConfig(level=logging.DEBUG)
+
 class PeerClient(Process):
     def __init__(self, parent):
         super(PeerClient, self).__init__()
@@ -31,14 +42,14 @@ class PeerClient(Process):
             peer_sock = socket(AF_INET, SOCK_STREAM)
             try:
                 peer_so.connect(conn_param)
+                peer_exch = MessageExchanger(peer_sock)
+                peer_action = dict(type='obtain', name=filename)
+                peer_exch.pkl_send(peer_action)
+                filepath = os.path.join(self.download_dir, filename)
+                peer_exch.file_recv(filepath, progress=False)
             except timeout:
                 # TODO: peer not reachable
                 continue
-            peer_exch = proto.MessageExchanger(peer_sock)
-            peer_action = dict(type='obtain', name=filename)
-            peer_exch.pkl_send(peer_action)
-            filepath = os.path.join(self.download_dir, filename)
-            peer_exch.file_recv(filepath, progress=False)
         return False, True
 
     def _search(self, filename, pprint=False):
@@ -71,11 +82,26 @@ class PeerClient(Process):
             path=os.path.abspath(filename)
         )
         self.idxserv_exch.pkl_send(idx_action)
+        replicate_to = self.idxserv_exch.pkl_recv()
 
         # Register locally
         files_dict = self.files_dict
         files_dict[f_name] = (idx_action['name'], idx_action['size'], idx_action['path'])
         self.files_dict = files_dict
+
+        # TODO: Replicate files
+        for peer in replicate_to:
+            conn_param = (peer['addr'], peer['port'])
+            peer_sock = socket(AF_INET, SOCK_STREAM)
+            try:
+                peer_so.connect(conn_param)
+                peer_exch = MessageExchanger(peer_sock)
+                peer_action = dict(type='replicate', filename=filename)
+                peer_exch.pkl_send(peer_action)
+                peer_exch.file_send(filename)
+            except timeout: # peer unreachable
+                continue
+
         return False, True
 
     def _ls(self, pprint=False):
@@ -148,7 +174,7 @@ class PeerClient(Process):
         try:
             self.idxserv_socket = socket(AF_INET, SOCK_STREAM)
             self.idxserv_socket.connect((self.idxserv_ip, self.idxserv_port))
-            self.idxserv_msg_exch = proto.MessageExchanger(self.idxserv_socket)
+            self.idxserv_msg_exch = MessageExchanger(self.idxserv_socket)
             self.__init_connection()
         except error as e:
             if e.errno == errno.ECONNREFUSED:
