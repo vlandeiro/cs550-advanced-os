@@ -1,94 +1,30 @@
-"""
-Usage:
-    python Peer.py <config.json>
- """
-from multiprocessing import Process, Manager, Queue, Value
-from socket import *
-from CommunicationProtocol import MessageExchanger
+from multiprocessing import Manager, Value
 
 import logging
 import json
 import sys
-import errno
 import os
-import time
-import random
+from peer_client import PeerClientUI
+from peer_server import PeerServer
 
 logging.basicConfig(level=logging.DEBUG)
     
 class Peer:
     def __init__(self, config):
-        self.download_dir = os.path.abspath(download_dir)
+        self.config = config
+        self.download_dir = os.path.abspath(config['download_dir'])
         if not os.path.isdir(self.download_dir):
             raise ValueError("Download directory does not exist")
 
-        self.listening_socket = None
-        self.idxserv_socket = None
-        self.idxserv_exch = None
-        self.peer_socket = None
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(logging.DEBUG)
 
         self.manager = Manager()
-        self.files_dict = self.manager.dict()
+        self.local_files = self.manager.dict()
         self.terminate = Value('i', 0)
-    
 
-    def __quit_server(self):
-        if self.listening_socket is not None:
-            self.listening_socket.close()
-            self.listening_socket = None
-
-    def __run_server(self):
-        """This function handles the connection from other peer to obtain
-        files.
-        
-        """
-        self.listening_socket = socket(AF_INET, SOCK_STREAM)
-        #self.listening_socket.settimeout(LISTENING_TIMEOUT)
-        self.listening_socket.bind(("0.0.0.0", self.listening_port))
-        self.listening_socket.listen(self.pool_size)
-        logger.debug("Peer server listening on port %d", self.listening_port)
-
-        self.server_running.value = 1
-        while True:
-            try:
-                peer_so, peer_addr = self.listening_socket.accept()
-                handler = Process(target=self.__peer_message_handler,
-                                  args=(peer_so, peer_addr))
-                handler.daemon = True
-                handler.start()
-            except KeyboardInterrupt:
-                pass
-            except timeout as e:
-                try:
-                    if not self.server_running.value:
-                        print("Shutting down service to other peers.")
-                # avoid Broken Pipe error registered as a bug in python 2.7
-                except IOError as e: 
-                    if e.errno == 32:
-                        pass
-                    else:
-                        raise
-                    break
-
-        self.__quit_server()
-        
-    def __quit_ui(self):
-        logger.debug("Quitting UI")
-        if self.idxserv_socket is not None and self.ui_running:
-            print("Closing connection to indexing server.")
-            self.idxserv_msg_exch.send("close_connection %d" % id(self), ack=True)
-            self.idxserv_socket.close()
-            self.idxserv_socket = None
-        try:
-            self.server_running.value = 0
-        except IOError as e:
-            if e.errno == 32:
-                pass
-            else:
-                raise
-        finally:
-            self.ui_running = False
-        return False
+        self.client = PeerClientUI(self)
+        self.server = PeerServer(self)
 
     def run(self):
         """Function that launches the different parts (server, user interface,
@@ -97,23 +33,14 @@ class Peer:
         """
         try:
             # First, start the server in a dedicated thread.
-            logger.debug("Starting the peer server.")
-            server = Process(target=self.__run_server)
-            server.start()
-            logger.debug("Peer server running.")
-
+            self.server.start()
             # Then, start the user interface
-            logger.debug("Starting the user interface.")
-            self.__run_ui()
+            self.logger.debug("Starting the user interface.")
+            self.client.run()
         except EOFError as e:
             print "\nShutting down peer."
         except:
-            self.__quit_ui()
             raise
-
-def usage_error():
-    print(__doc__.strip())
-    sys.exit(1)
 
 def format_filesize(f_size):
     prefixes = ['', 'K', 'M', 'G', 'T', 'P']
@@ -125,20 +52,17 @@ def format_filesize(f_size):
     f_size_str = "%.1f%sB" % (f_size, prefix)
     return f_size_str
 
-def sample_with_replacement(l, k):
-    if l:
-        lt = l*k
-        return random.sample(lt, k)
-    else:
-        return []
+def print_usage(args):
+    print("Usage: python %s config.json" % args[0])
+    sys.exit(1)
 
 if __name__ == '__main__':
     # parse arguments
     args = sys.argv
     if len(args) != 2:
-        usage_error()
+        print_usage(args)
     with open(args[1]) as config_fd:
         run_args = json.load(config_fd)
         
-    peer = Peer(**run_args)
+    peer = Peer(run_args)
     peer.run()

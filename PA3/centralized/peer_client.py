@@ -1,21 +1,35 @@
+import glob
 import logging
-import os
-import errno
+from multiprocessing import Process
+import random
 import time
+import os
 import sys
-
 from socket import *
 from CommunicationProtocol import MessageExchanger
 
 logging.basicConfig(level=logging.DEBUG)
 
+
+def sample_with_replacement(l, k):
+    if l:
+        lt = l * k
+        return random.sample(lt, k)
+    else:
+        return []
+
 class PeerClient(Process):
     def __init__(self, parent):
-        super(PeerClient, self).__init__()
-
+        self.idxserv_port = parent.config['idxserv_port']
+        self.idxserv_ip = parent.config['idxserv_ip']
+        self.idxserv_sock = None
+        self.idxserv_exch = None
+        self.download_dir = parent.config['download_dir']
+        self.max_connections = parent.config['max_connections']
         self.parent = parent
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.INFO)
+        level = logging.getLevelName(parent.config.get('log', 'INFO'))
+        self.logger.setLevel(level)
 
         self.actions = {
             'exit': self._exit,
@@ -23,8 +37,8 @@ class PeerClient(Process):
             'search': self._search,
             'register': self._register,
             'list': self._ls,
-            'help': lambda x: self._display_help(),
-            'benchmark': self._benchmark
+            'help': self._display_help,
+            'ls': self._local_ls
         }
 
     def _exit(self):
@@ -36,24 +50,33 @@ class PeerClient(Process):
         file_obtained = False
         while not file_obtained and available_peers:
             peer = available_peers.pop(0)
-            
+            self.logger.debug(peer)
             # Establish connection to the peer to obtain file
-            conn_param = (peer['addr'], peer['port'])
+            addr, port = peer.split(':')
+            port = int(port)
+            conn_param = (addr, port)
             peer_sock = socket(AF_INET, SOCK_STREAM)
             try:
-                peer_so.connect(conn_param)
+                peer_sock.connect(conn_param)
                 peer_exch = MessageExchanger(peer_sock)
                 peer_action = dict(type='obtain', name=filename)
                 peer_exch.pkl_send(peer_action)
                 filepath = os.path.join(self.download_dir, filename)
-                peer_exch.file_recv(filepath, progress=False)
+                file_exists = peer_exch.pkl_recv()
+                if file_exists:
+                    peer_exch.file_recv(filepath, show_progress=False)
+                    return False, True
+                else:
+                    return False, False
             except timeout:
-                # TODO: peer not reachable
+                # peer not reachable
                 continue
-        return False, True
+            finally:
+                peer_sock.close()
+        return False, False
 
-    def _search(self, filename, pprint=False):
-        idx_action = dict(type='search', name=filename)
+    def _search(self, filename, pprint=True):
+        idx_action = dict(type='search', id=self.get_id(), name=filename)
         # request indexing server
         self.idxserv_exch.pkl_send(idx_action)
         available_peers = self.idxserv_exch.pkl_recv()
@@ -65,50 +88,63 @@ class PeerClient(Process):
                 print("File unavailable in other peers.")
             else:
                 print("File available at the following peers:")
-            for p in available_peers:
-                print("\t- %s:%d" % (p['addr'], p['port']))
+                for p in available_peers:
+                    print "\t- %s" % p
         return False, available_peers
 
     def _register(self, filename):
         if not os.path.isfile(filename):
             print("Error: %s does not exist or is not a file." % filename)
-            return True, False
+            return False, False
 
         # Register to the indexing server
+        name = os.path.basename(filename)
         idx_action = dict(
             type='register',
-            name=os.path.basename(filename),
-            size=os.path.getsize(filename),
-            path=os.path.abspath(filename)
+            name=name,
+            id=self.get_id()
         )
         self.idxserv_exch.pkl_send(idx_action)
         replicate_to = self.idxserv_exch.pkl_recv()
 
         # Register locally
-        files_dict = self.files_dict
-        files_dict[f_name] = (idx_action['name'], idx_action['size'], idx_action['path'])
-        self.files_dict = files_dict
+        local_files = self.parent.local_files
+        local_files[name] = os.path.abspath(filename)
+        self.parent.local_files = local_files
 
-        # TODO: Replicate files
+        # Replicate files
+        self.logger.debug("Replicate to %s", replicate_to)
         for peer in replicate_to:
-            conn_param = (peer['addr'], peer['port'])
+            addr, port = peer.split(':')
+            port = int(port)
+            conn_param = (addr, port)
             peer_sock = socket(AF_INET, SOCK_STREAM)
             try:
-                peer_so.connect(conn_param)
+                peer_sock.connect(conn_param)
                 peer_exch = MessageExchanger(peer_sock)
-                peer_action = dict(type='replicate', filename=filename)
+                peer_action = dict(
+                    type='replicate',
+                    name=name
+                )
                 peer_exch.pkl_send(peer_action)
                 peer_exch.file_send(filename)
-            except timeout: # peer unreachable
+            except timeout:  # peer unreachable
                 continue
 
         return False, True
 
-    def _ls(self, pprint=False):
+    def _local_ls(self, regex="./*"):
+        ls = glob.glob(regex)
+        sizes = [os.path.getsize(f) for f in ls]
+        for name, size in zip(ls, sizes):
+            print("%40s - %40d" % (name, size))
+        return False, None
+
+    def _ls(self, pprint=True):
         idx_action = dict(type='list')
         self.idxserv_exch.pkl_send(idx_action)
-        available_files = self.idxserv_msg_exch.pkl_recv()
-        if pprint:
+        available_files = self.idxserv_exch.pkl_recv()
+        if pprint != False:
             for f in available_files:
                 print f
         return False, available_files
@@ -119,89 +155,86 @@ class PeerClient(Process):
             'lookup': 'Download a given file from an available peer.',
             'search': 'Return the list of other peers having a given file.',
             'register': 'Register a given file to the indexing server.',
+            'ls': 'Local listing of files',
             'list': 'List all the available files through the indexing server.',
             'help': 'Display the help screen.',
-            'benchmark': 'Benchmark a function (lookup, search, or register) by running this command N times and averaging the runtime.'
         }
         keys = sorted(help_ui.keys())
         for k in keys:
             print("{:<20}{:<20}".format(k, help_ui[k]))
         return False, True
 
-    def _benchmark(self, bench_cmd, nb_loops):
-        # dictionary of possible actions to benchmark
-        benchmark_actions = {
-            'search': self._search,
-            'lookup': self._lookup,
-            'register': self._register
-        }
+    def get_id(self):
+        addr = self.parent.config['listening_ip']
+        port = self.parent.config['listening_port']
+        return ":".join([addr, str(port)])
 
-        benchmark_files = []
-        # get all available files in other peers in case of a lookup/search benchmark
-        if bench_cmd in ['lookup', 'search']:
-            file_list = self._ls()
-            for f_name, f_size, f_path in file_list:
-                _, available_peers = self._search(f_name)
-                if available_peers:
-                    benchmark_files.append(f_name)
-        else: # get files to register by this node
-            # TODO
-            pass
-        
-        # build list of random files for lookup/search benchmark
-        if not benchmark_files:
-            print "There are no file available for this type of benchmark."
-            return False, True
-        query_files = sample_with_replacement(other_peers_file, nb_loops)
+    def _init_connection(self):
+        """
+        Initialize the connection with the indexing server.
+        :return:
+        """
+        idx_action = dict(
+            type='init',
+            id=self.get_id()
+        )
+        self.idxserv_exch.pkl_send(idx_action)
+        return False, None
 
-        # Start time and run loop of actions
-        t0 = time.time()
-        for i in range(nb_loops):
-            # add file to cmd when benchmarking search/lookup
-            _, results = benchmark_actions[bench_cmd](new_cmd_vec + [query_files[i]])
-        t1 = time.time()
-        delta = t1-t0
-        avg_delta = delta*1000./nb_loops
-        self.__block_print("Total time: %.2fs\nAverage time: %.2fms" % (delta, avg_delta))
-        return False, True
-    
+    def close_connection(self):
+        idx_action = dict(type='close', id=self.get_id())
+        self.idxserv_exch.pkl_send(idx_action)
+
+    def do(self, action, args):
+        if action not in self.actions.keys():
+            print "Error: unvalid command '%s'" % " ".join([action] + args)
+            print "Use the help command to get more informations."
+        else:
+            try:
+                return self.actions[action](*args)
+            except TypeError as e:
+                self.logger.error(e.message)
+        return False, False
+
+
+class PeerClientUI(PeerClient):
+    def __init__(self, parent):
+        super(PeerClientUI, self).__init__(parent)
+
     def run(self):
         """This function handles the user input and the connections to the
         indexing server and the other peers.
         """
-        self.ui_running = False
         # Start by connecting to the Indexing Server
         try:
-            self.idxserv_socket = socket(AF_INET, SOCK_STREAM)
-            self.idxserv_socket.connect((self.idxserv_ip, self.idxserv_port))
-            self.idxserv_msg_exch = MessageExchanger(self.idxserv_socket)
-            self.__init_connection()
+            self.idxserv_sock = socket(AF_INET, SOCK_STREAM)
+            self.idxserv_sock.connect((self.idxserv_ip, self.idxserv_port))
+            self.idxserv_exch = MessageExchanger(self.idxserv_sock)
+            self._init_connection()
         except error as e:
             if e.errno == errno.ECONNREFUSED:
-                logger.error("Connection refused by the Indexing Server. Are you sure the Indexing Server is running?")
+                self.logger.error(
+                    "Connection refused by the Indexing Server. Are you sure the Indexing Server is running?")
                 sys.exit(1)
 
-        self.ui_running = True
-        retval = True
-        while retval:
-            sys.stdout.write("$> ")
-            sys.stdout.flush()
+        terminate = False
+        try:
+            while not terminate:
+                sys.stdout.write("$> ")
+                sys.stdout.flush()
 
-            try:
                 # Getting user input
                 cmd_str = raw_input()
                 cmd_vec = cmd_str.split()
-                
-                # Parsing user command
-                cmd_action = cmd_vec[0] if len(cmd_vec) >= 1 else ''
-                # If invalid command, print error message to user
-                if cmd_action not in self.ui_actions.keys():
-                    self.__block_print("Error: unvalid command '%s'" % cmd_str)
-                    print("Use the help command to get more informations.")
-                    #self.ui_actions['help'](None)
-                # If valid command, execute the matching action
-                else:
-                    retval = self.ui_actions[cmd_action](cmd_vec)
-            except KeyboardInterrupt as e:
-                sys.stderr.write("\r\n")
 
+                # Parsing user command
+                action = cmd_vec[0] if len(cmd_vec) >= 1 else ''
+                args = cmd_vec[1:]
+                terminate, res = self.do(action, args)
+                print res
+        except KeyboardInterrupt as e:
+            sys.stderr.write("\r\n")
+        finally:
+            self.parent.terminate.value = 1
+            self.close_connection()
+            self.idxserv_sock.close()

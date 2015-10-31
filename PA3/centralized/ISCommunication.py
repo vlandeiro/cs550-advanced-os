@@ -4,7 +4,7 @@ from hashlib import md5
 from CommunicationProtocol import MessageExchanger
 from socket import *
 
-class ISCommunication():
+class HT():
     __metaclass__ = abc.ABCMeta
     
     @abc.abstractmethod
@@ -19,7 +19,7 @@ class ISCommunication():
         associated with the given key."""
         return
 
-class CentralizedISCom(ISCommunication):
+class CentralizedHT(HT):
     def __init__(self, config):
         self.ip = config['ip']
         self.port = config['port']
@@ -44,7 +44,7 @@ class CentralizedISCom(ISCommunication):
             return False
         return self.msg_exch.recv()
 
-class DecentralizedISCom(ISCommunication):
+class DecentralizedISCom(HT):
     def __init__(self, config):
         self.nodes = config['nodes']
         self.nodes_count = len(self.nodes)

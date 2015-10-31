@@ -6,8 +6,8 @@ from urllib2 import urlopen
 
 doc = """
 Usage:
-   ./gen_config.py server [listening_port=P] [pool_size=S]
-   ./gen_config.py peer server_ip server_port [listening_port=P] [pool_size=S] [files_regex=R] [download_dir=D]
+   ./gen_config.py server [listening_port=P] [max_connections=S]
+   ./gen_config.py peer server_ip server_port [listening_port=P] [max_connections=S] [download_dir=D]
 """
 
 def print_err(msg):
@@ -25,10 +25,11 @@ if __name__ == '__main__':
     
     types_dict = {
         "listening_port": int,
-        "pool_size": int,
+        "max_connections": int,
         "idxserv_port": int,
-        "files_regex": str,
-        "download_dir": str
+        "download_dir": str,
+        "log": str,
+        "replica": int
     }
 
     template_files = {
