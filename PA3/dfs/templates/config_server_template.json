@@ -1,0 +1,8 @@
+{
+    "listening_ip": "localhost",
+    "listening_port": 4000,
+    "max_connections": 5,
+    "timeout_value": 0.1,
+    "log": "DEBUG",
+    "replica": 0
+}
