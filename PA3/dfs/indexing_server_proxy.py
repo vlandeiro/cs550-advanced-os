@@ -83,7 +83,8 @@ class DistributedISProxy(ISProxy):
             if ip != self.parent.ip:
                 sock = self.get_peer_sock(sid)
                 exch = MessageExchanger(sock)
-                exch.send("keys")
+                dht_action = dict(action="keys", args=[])
+                exch.pkl_send(dht_action)
                 res = exch.pkl_recv()
                 ls |= set(res)
         return list(ls)

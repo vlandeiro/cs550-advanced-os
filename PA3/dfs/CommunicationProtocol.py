@@ -8,18 +8,6 @@ import logging
 
 BUFFER_SIZE = 4096
 
-py2str = {
-    True: "SUCCESS",
-    False: "FAILURE",
-    None: "NONE"
-}
-
-str2py = {
-    "SUCCESS": True,
-    "FAILURE": False,
-    "NONE": None
-}
-
 logging.basicConfig(level=logging.DEBUG)
 
 class MessageExchanger:
@@ -65,6 +53,7 @@ class MessageExchanger:
 
         """
         str_obj = self.recv()
+        self.logger.debug("recv pkl str: %s", str_obj)
         obj = pickle.loads(str_obj)
         self.logger.debug("recv pkl: %s", repr(obj))
         return obj
