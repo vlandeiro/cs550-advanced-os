@@ -33,6 +33,13 @@ class Peer:
         if self.idx_type == 'distributed':
             self.nodes_list = config['nodes']
             self.replica = config['replica']
+            # get this server info from config file
+            this_ip = str(json.load(urlopen('https://api.ipify.org/?format=json'))['ip'])
+            if this_ip not in nodes_list:
+                raise ValueError("peer %s is not included in the config file." % this_ip)
+            self.id = nodes_list.index(this_ip)
+            
+
 
         # create shared dictionary to store the paths to the local files
         self.manager = Manager()

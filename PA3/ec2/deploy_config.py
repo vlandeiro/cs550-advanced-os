@@ -37,7 +37,7 @@ def deploy_config(access_id, secret_key, ssh_key_file):
     print("Start deploying config file.")
     for instance in instances:
         print("Copy configuration file to %s" % instance.ip_address)
-        cmd = "scp -i -q %s config.json ubuntu@%s:/home/ubuntu/cs550-advanced-os/PA3/dfs/config.json" % (ssh_key_file, instance.ip_address)
+        cmd = "scp -q -i %s config.json ubuntu@%s:/home/ubuntu/cs550-advanced-os/PA3/dfs/config.json" % (ssh_key_file, instance.ip_address)
         call(cmd.split())
     print("Configuration deployed on DHT nodes.")
     
