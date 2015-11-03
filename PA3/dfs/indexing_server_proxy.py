@@ -98,7 +98,10 @@ class DistributedISProxy(ISProxy):
         return []
 
     def search(self, id, name):
-        return self._get(name)
+        available_peers = self._get(name)
+        if id in available_peers:
+            available_peers.remove(id)
+        return available_peers
 
     def _generic_action(self, action, key, args):
         sys.stderr.write("%s\n" % action)
@@ -111,10 +114,9 @@ class DistributedISProxy(ISProxy):
         else:
             sock = self.get_peer_sock(server_id)
             exch = MessageExchanger(sock)
-            exch.send("%s %s" % (action, " ".join(args)))
-            res = exch.recv()
-            if res in str2py:
-                res = str2py[res]
+            dht_action = dict(action=action, args=args)
+            exch.pkl_send(dht_action)
+            res = exch.pkl_recv()
         return res
 
     def _put(self, key, value):

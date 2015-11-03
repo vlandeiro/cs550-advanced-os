@@ -60,22 +60,18 @@ class DHTServer(Process):
                     self.socket_list.remove(sock)
                     break
                 if readable:
-                    cmd = exch.recv()
+                    dht_action = exch.pkl_recv()
                     if cmd is None:
                         continue
-                    cmd_vec = cmd.split()
-                    action = cmd_vec[0]
-                    args = cmd_vec[1:]
-                    self.logger.debug("Request %s received." % (cmd))
+                    action = dht_action['action']
+                    args = dht_action['args']
+                    self.logger.debug("Request %s received." % (action))
 
                     if action not in self.actions_list:
-                        exch.send(py2str[None])
+                        exch.pkl_send(None)
                     else:
                         res = self.actions_list[action](*args)
-                        if res in py2str:
-                            exch.send(py2str[res])
-                        else:
-                            exch.send(res)
+                        exch.pkl_send(res)
                 if self.parent.terminate.value == 1:
                     break
         except KeyboardInterrupt as e:

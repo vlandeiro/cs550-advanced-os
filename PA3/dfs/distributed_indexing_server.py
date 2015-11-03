@@ -12,7 +12,7 @@ from multiprocessing import Manager, Value, Lock, Process
 logging.basicConfig(level=logging.DEBUG)
 
 class DHT():
-    def __init__(self, config):
+    def __init__(self, config, terminate):
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.DEBUG)
@@ -36,7 +36,7 @@ class DHT():
         self.hashmap = self.manager.dict()
         self.map_lock = self.manager.Lock()
 
-        self.terminate = Value('i', 0)
+        self.terminate = terminate
 
         self.server = DHTServer(self)
 

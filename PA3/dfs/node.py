@@ -51,7 +51,7 @@ class Peer:
         self.client = PeerClient(self)
         self.file_server = PeerServer(self)
         if self.idx_type == 'distributed':
-            self.dht = DHT(config)
+            self.dht = DHT(config, self.terminate)
 
     def run(self):
         """Function that launches the different parts (server, user interface,
@@ -60,7 +60,7 @@ class Peer:
         """
         try:
             # First, start the file server in a dedicated thread.
-            #self.file_server.start()
+            self.file_server.start()
             # After that, run the indexing server if the config is set to distributed
             if self.idx_type == 'distributed':
                self.dht.server.start()
@@ -69,7 +69,7 @@ class Peer:
             self.logger.debug("Starting the user interface.")
             self.client.run()
             # Join the background processes
-            # self.file_server.join()
+            self.file_server.join()
             if self.idx_type == 'distributed':
                 self.dht.server.join()
         except EOFError as e:
