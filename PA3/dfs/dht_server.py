@@ -61,7 +61,7 @@ class DHTServer(Process):
                     break
                 if readable:
                     dht_action = exch.pkl_recv()
-                    if cmd is None:
+                    if dht_action is None:
                         continue
                     action = dht_action['action']
                     args = dht_action['args']
