@@ -83,11 +83,9 @@ class PeerClient(Process):
         available_peers = self.idxserv_proxy.search(self.id, name)
 
         if pprint:
-            if available_peers is None:
-                pass
-            elif available_peers == []:
+            if available_peers == []:
                 print("File unavailable in other peers.")
-            else:
+            elif available_peers is not None:
                 print("File available at the following peers:")
                 for p in available_peers:
                     print "\t- %s" % p
@@ -174,7 +172,7 @@ class PeerClient(Process):
                 return self.actions[action](*args)
             except TypeError as e:
                 self.logger.error(e.message)
-                raise e
+                raise
         return False, False
 
     def run(self):

@@ -117,7 +117,7 @@ class DistributedISProxy(ISProxy):
 
     def search(self, id, name):
         available_peers = self._get(name)
-        if id in available_peers:
+        if available_peers is not None and id in available_peers:
             available_peers.remove(id)
         return available_peers
 
