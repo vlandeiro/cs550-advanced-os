@@ -87,7 +87,7 @@ class DHTServer(Process):
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
         self.listening_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.listening_socket.bind(("0.0.0.0", self.parent.port))
-        self.listening_socket.listen(self.parent.peers_count)
+        self.listening_socket.listen(self.parent.nodes_count)
         self.logger.info("DHT server listening on port %d." % (self.parent.port))
 
         read_list = [self.listening_socket]

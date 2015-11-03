@@ -1,4 +1,5 @@
 import abc
+import sys
 
 from hashlib import md5
 from CommunicationProtocol import *
@@ -66,7 +67,7 @@ class DistributedISProxy(ISProxy):
         if server_id not in self.socket_map:
             sock = socket(AF_INET, SOCK_STREAM)
             peer_ip = self.parent.nodes_list[server_id]
-            sock.connect((peer_ip, self.parent.idx_server_port))
+            sock.connect((peer_ip, self.parent.port))
             self.socket_map[server_id] = sock
         return self.socket_map[server_id]
 
@@ -78,23 +79,29 @@ class DistributedISProxy(ISProxy):
 
     def list(self):
         ls = set(self.parent.keys())
-        for sid in self.parent.nodes_list:
-            sock = self.get_peer_sock(sid)
-            exch = MessageExchanger(sock)
-            exch.send("keys")
-            res = exch.pkl_recv()
-            ls |= set(res)
+        for sid, ip in enumerate(self.parent.nodes_list):
+            if ip != self.parent.ip:
+                sock = self.get_peer_sock(sid)
+                exch = MessageExchanger(sock)
+                exch.send("keys")
+                res = exch.pkl_recv()
+                ls |= set(res)
         return list(ls)
 
     def register(self, id, name):
-        self._put(id, name)
+        previous_peers = self._get(name)
+        if previous_peers is None:
+            previous_peers = []
+        previous_peers.append(id)
+        self._put(name, previous_peers)
         # TODO: file replication and metadata replication
         return []
 
     def search(self, id, name):
-        self._get(name)
+        return self._get(name)
 
     def _generic_action(self, action, key, args):
+        sys.stderr.write("%s\n" % action)
         # hash key to get the server id
         server_id = self.parent.server_hash(key)
         # if local call parent, else call or connect to server

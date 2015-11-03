@@ -7,7 +7,7 @@ import os
 
 from urllib2 import urlopen
 from distributed_indexing_server import DHT
-from peer_client import PeerClientUI
+from peer_client import PeerClient
 from peer_server import PeerServer
 
 logging.basicConfig(level=logging.DEBUG)
@@ -34,14 +34,13 @@ class Peer:
 
         if self.idx_type == 'distributed':
             self.nodes_list = config['nodes']
+            self.nodes_count = len(self.nodes_list)
             self.replica = config['replica']
             # get this server info from config file
-            this_ip = str(json.load(urlopen('https://api.ipify.org/?format=json'))['ip'])
-            if this_ip not in nodes_list:
-                raise ValueError("peer %s is not included in the config file." % this_ip)
-            self.id = nodes_list.index(this_ip)
-            
-
+            self.this_ip = str(json.load(urlopen('https://api.ipify.org/?format=json'))['ip'])
+            if self.this_ip not in self.nodes_list:
+                raise ValueError("peer %s is not included in the config file." % self.this_ip)
+            self.id = self.nodes_list.index(self.this_ip)
 
         # create shared dictionary to store the paths to the local files
         self.manager = Manager()
@@ -49,9 +48,10 @@ class Peer:
         self.terminate = Value('i', 0)
 
         # create main processes
-        self.client = PeerClientUI(self)
+        self.client = PeerClient(self)
         self.file_server = PeerServer(self)
-        self.dht = DHT(config)
+        if self.idx_type == 'distributed':
+            self.dht = DHT(config)
 
     def run(self):
         """Function that launches the different parts (server, user interface,
@@ -60,11 +60,18 @@ class Peer:
         """
         try:
             # First, start the file server in a dedicated thread.
-            self.file_server.start()
-
+            #self.file_server.start()
+            # After that, run the indexing server if the config is set to distributed
+            if self.idx_type == 'distributed':
+               self.dht.server.start()
+            
             # Then, start the user interface
             self.logger.debug("Starting the user interface.")
             self.client.run()
+            # Join the background processes
+            # self.file_server.join()
+            if self.idx_type == 'distributed':
+                self.dht.server.join()
         except EOFError as e:
             print "\nShutting down peer."
         except:

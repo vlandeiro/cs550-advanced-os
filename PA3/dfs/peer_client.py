@@ -21,10 +21,9 @@ def sample_with_replacement(l, k):
 
 class PeerClient(Process):
     def __init__(self, parent):
-        self.idxserv_port = parent.config['idxserv_port']
-        self.idxserv_ip = parent.config['idxserv_ip']
-        addr = self.parent.config['listening_ip']
-        port = self.parent.config['listening_port']
+        self.idxserv_port = parent.idx_server_port
+        self.ip = parent.this_ip
+        port = parent.config['file_server_port']
         self.download_dir = parent.config['download_dir']
         self.max_connections = parent.config['max_connections']
         self.parent = parent
@@ -32,7 +31,7 @@ class PeerClient(Process):
         level = logging.getLevelName(parent.config.get('log', 'INFO'))
         self.logger.setLevel(level)
 
-        self.id = ":".join([addr, str(port)])
+        self.id = ":".join([self.ip, str(port)])
         self.idxserv_sock = None
         self.idxserv_proxy = None
 
@@ -175,12 +174,8 @@ class PeerClient(Process):
                 return self.actions[action](*args)
             except TypeError as e:
                 self.logger.error(e.message)
+                raise e
         return False, False
-
-
-class PeerClientUI(PeerClient):
-    def __init__(self, parent):
-        super(PeerClientUI, self).__init__(parent)
 
     def run(self):
         """This function handles the user input and the connections to the
@@ -188,17 +183,16 @@ class PeerClientUI(PeerClient):
         """
         # Start by connecting to the Indexing Server
         try:
-            self.idxserv_sock = socket(AF_INET, SOCK_STREAM)
-            self.idxserv_sock.connect((self.idxserv_ip, self.idxserv_port))
-            if self.parent.type == 'centralized':
+            if self.parent.idx_type == 'centralized':
+                self.idxserv_sock = socket(AF_INET, SOCK_STREAM)
+                self.idxserv_sock.connect((self.idxserv_ip, self.idxserv_port))
                 self.idxserv_proxy = CentralizedISProxy(self.idxserv_sock)
             else:
-                self.idxserv_proxy = DistributedISProxy(self.parent)
+                self.idxserv_proxy = DistributedISProxy(self.parent.dht)
             self._init_connection()
         except error as e:
             if e.errno == errno.ECONNREFUSED:
-                self.logger.error(
-                    "Connection refused by the Indexing Server. Are you sure the Indexing Server is running?")
+                self.logger.error("Connection refused by the Indexing Server. Are you sure the Indexing Server is running?")
                 sys.exit(1)
 
         terminate = False
@@ -214,6 +208,7 @@ class PeerClientUI(PeerClient):
                 # Parsing user command
                 action = cmd_vec[0] if len(cmd_vec) >= 1 else ''
                 args = cmd_vec[1:]
+
                 terminate, res = self.do(action, args)
                 print res
         except KeyboardInterrupt as e:
@@ -221,4 +216,4 @@ class PeerClientUI(PeerClient):
         finally:
             self.parent.terminate.value = 1
             self.close_connection()
-            self.idxserv_sock.close()
+            self.idxserv_proxy.close_connection(self.id)

@@ -20,8 +20,8 @@ class PeerServer(Process):
             'obtain': self._obtain,
             'replicate': self._recv_replica
         }
-        self.ip = parent.config['listening_ip']
-        self.port = parent.config['listening_port']
+        self.ip = parent.this_ip
+        self.port = parent.config['file_server_port']
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
         self.listening_socket.setblocking(0)
         self.listening_socket.bind(("0.0.0.0", self.port))
