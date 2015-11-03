@@ -53,6 +53,8 @@ class MessageExchanger:
 
         """
         str_obj = self.recv()
+        if str_obj is None:
+            return None
         self.logger.debug("recv pkl str: %s", str_obj)
         obj = pickle.loads(str_obj)
         self.logger.debug("recv pkl: %s", repr(obj))

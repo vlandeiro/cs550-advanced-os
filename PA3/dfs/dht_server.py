@@ -62,7 +62,7 @@ class DHTServer(Process):
                 if readable:
                     dht_action = exch.pkl_recv()
                     if dht_action is None:
-                        continue
+                        break
                     action = dht_action['action']
                     args = dht_action['args']
                     self.logger.debug("Request %s received." % (action))
