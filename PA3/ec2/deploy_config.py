@@ -31,7 +31,7 @@ def deploy_config(access_id, secret_key, ssh_key_file):
             if instance.state == 'running':
                 instances.append(instance)
                 nodes_list.append(instance.ip_address)
-    config['nodes_list'] = nodes_list
+    config['nodes'] = nodes_list
     with open("config.json", "w") as config_fd:
         config_fd.write(json.dumps(config))
     print("Configuration file created.")

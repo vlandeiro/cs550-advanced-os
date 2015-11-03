@@ -4,6 +4,8 @@ import logging
 import json
 import sys
 import os
+
+from urllib2 import urlopen
 from distributed_indexing_server import DHT
 from peer_client import PeerClientUI
 from peer_server import PeerServer
