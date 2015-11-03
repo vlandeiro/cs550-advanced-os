@@ -121,19 +121,19 @@ class DistributedISProxy(ISProxy):
             available_peers.remove(id)
         return available_peers
 
-    def _generic_action(self, action, key, args):
-        # hash key to get the server id
-        server_id = self.parent.server_hash(key)
-        return self._generic_action_sid(server_id, action, key, args)
+    # def _generic_action(self, action, key, args):
+    #     # hash key to get the server id
+    #     server_id = self.parent.server_hash(key)
+    #     return self._generic_action_sid(server_id, action, key, args)
 
     def _generic_action_sid(self, sid, action, args):
         sys.stderr.write("%s\n" % action)
         # if local call parent, else call or connect to server
-        if server_id == self.parent.id:
+        if sid == self.parent.id:
             method = getattr(self.parent, action)
             res = method(*args)
         else:
-            sock = self.get_peer_sock(server_id)
+            sock = self.get_peer_sock(sid)
             if sock is None:
                 return False
             exch = MessageExchanger(sock)
