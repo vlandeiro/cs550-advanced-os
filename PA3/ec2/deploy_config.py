@@ -4,6 +4,7 @@ import json
 from subprocess import call
 
 default_distributed = {
+    'idx_type': 'distributed',
     'log_level': 'INFO',
     'replica': 1,
     'max_connections': 20,
