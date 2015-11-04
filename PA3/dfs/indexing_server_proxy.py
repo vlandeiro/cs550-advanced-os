@@ -135,7 +135,7 @@ class DistributedISProxy(ISProxy):
                 ls |= set(res)
         return list(ls)
 
-    def _local_register(self, id, name):
+    def _local_register(self, id, name, replicate=True):
         previous_value = self._get(name)
         self.logger.debug(repr(previous_value))
         if previous_value is False:  # nodes are offline
@@ -143,7 +143,7 @@ class DistributedISProxy(ISProxy):
         if previous_value is None:
             previous_value = []
         previous_value.append(id)
-        self._put(name, previous_value)
+        self._put(name, previous_value, replicate=replicate)
 
     def register(self, id, name):
         self._local_register(id, name)
@@ -159,7 +159,7 @@ class DistributedISProxy(ISProxy):
         else:
             replicate_to = np.random.choice(other_peers, nb_replica)
         for k in replicate_to:
-            self._local_register(k, name)
+            self._local_register(k, name, replicate=False)
         return replicate_to
 
     def search(self, id, name):
@@ -169,7 +169,7 @@ class DistributedISProxy(ISProxy):
         return available_peers
 
     def _generic_action_sid(self, sid, action, args):
-        self.logger.debug("%s %s %s", action, sid, self.parent.id)
+        self.logger.debug("%s in %s", action, sid)
         # if local, call parent
         if sid == self.parent.id:
             self.logger.debug("Local function call")
@@ -187,10 +187,11 @@ class DistributedISProxy(ISProxy):
             res = exch.pkl_recv()
         return res
 
-    def _put(self, key, value):
+    def _put(self, key, value, replicate=True):
         sid = self.parent.server_hash(key)
-        sid_replica = (sid + 1) % self.parent.nodes_count
-        self._generic_action_sid(sid_replica, "put", [key, value])
+        if replicate:
+            sid_replica = (sid + 1) % self.parent.nodes_count
+            self._generic_action_sid(sid_replica, "put", [key, value])
         return self._generic_action_sid(sid, "put", [key, value])
 
     def _get(self, key):
