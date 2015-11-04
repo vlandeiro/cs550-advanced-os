@@ -9,8 +9,6 @@ import numpy as np
 from CommunicationProtocol import MessageExchanger
 
 logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 class IndexingServer:
@@ -27,7 +25,8 @@ class IndexingServer:
         self.max_connections = config['max_connections']
 
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.DEBUG)
+        level = logging.getLevelName(config['log_level'])
+        self.logger.setLevel(level)
 
         self.manager = Manager()
         self.file2peers = self.manager.dict()

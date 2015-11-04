@@ -87,7 +87,7 @@ class PeerClient(Process):
                     return False, True
                 else:
                     return False, False
-            except timeout:
+            except error:
                 # peer not reachable
                 continue
             finally:
@@ -145,8 +145,7 @@ class PeerClient(Process):
                     peer_action = dict(type='replicate', name=name)
                     peer_exch.pkl_send(peer_action)
                     peer_exch.file_send(f_path)
-                except timeout:  # peer unreachable
-                    self.logger.debug('Cannot replicate, timeout reached.')
+                except error:  # peer unreachable
                     continue
 
         ret = True if replicate_to else False

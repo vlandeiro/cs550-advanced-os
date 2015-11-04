@@ -3,6 +3,7 @@ import sys
 import errno
 import logging
 import numpy as np
+import copy
 
 from hashlib import md5
 from CommunicationProtocol import *
@@ -64,8 +65,6 @@ class ISProxy():
 class CentralizedISProxy(ISProxy):
     def __init__(self, sock):
         self.exch = MessageExchanger(sock)
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.DEBUG)
 
     def init_connection(self, id):
         idx_action = dict(type='init', id=id)
@@ -99,10 +98,11 @@ class DistributedISProxy(ISProxy):
         self.parent = parent
         self.socket_map = [None] * self.parent.nodes_count
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.getLevelName(self.parent.log_level))
 
     def get_peer_sock(self, server_id):
-        if server_id not in self.socket_map:
+        self.logger.debug("Server id requested: %s", repr(server_id))
+        if self.socket_map[server_id] is None:
             sock = socket(AF_INET, SOCK_STREAM)
             peer_ip = self.parent.nodes_list[server_id]
             try:
@@ -147,7 +147,7 @@ class DistributedISProxy(ISProxy):
 
     def register(self, id, name):
         self._local_register(id, name)
-        other_peers = self.parent.nodes_list
+        other_peers = copy.copy(self.parent.nodes_list)
         other_peers.pop(self.parent.id)
         other_peers = [":".join([x, str(self.parent.config['file_server_port'])]) for x in other_peers]
         nb_replica = self.parent.replica

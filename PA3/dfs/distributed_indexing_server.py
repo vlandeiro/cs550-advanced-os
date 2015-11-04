@@ -19,7 +19,8 @@ class DHT():
         """
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.DEBUG)
+        self.log_level = logging.getLevelName(config['log_level'])
+        self.logger.setLevel(self.log_level)
 
         self.nodes_list = config['nodes']
         self.nodes_count = len(self.nodes_list)
