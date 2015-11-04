@@ -1,4 +1,3 @@
-import json
 import logging
 import sys
 
@@ -9,8 +8,14 @@ from socket import *
 
 logging.basicConfig(level=logging.DEBUG)
 
+
 class DHTServer(Process):
     def __init__(self, parent):
+        """
+        Initialize a distributed hash table server object.
+        :param parent: DHT object.
+        :return: None
+        """
         super(DHTServer, self).__init__()
 
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -18,7 +23,7 @@ class DHTServer(Process):
 
         self.parent = parent
         self.listening_socket = None
-        
+
         self.actions_list = {
             "put": self._put,
             "get": self._get,
@@ -28,24 +33,50 @@ class DHTServer(Process):
         self.socket_list = []
 
     def _keys(self):
+        """
+        Call its parent function to get the keys of local hashtable.
+        :return: keys of the local hash table.
+        """
         self.logger.debug("keys")
         return self.parent.keys()
 
     def _put(self, key, value):
+        """
+        Call its parent function to put a key-value pair in the local hashtable.
+        :param key: key to put in the local hashtable.
+        :param value: value to put in the local hashtable.
+        :return: True
+        """
         self.logger.debug("put")
         self.parent.put(key, value)
         return True
 
     def _get(self, key):
+        """
+        Call its parent function to get the value associated with a given key in the local hashtable.
+        :param key: key to put in the local hashtable.
+        :return: value associated with the key.
+        """
         self.logger.debug("get")
         return self.parent.get(key)
 
     def _del(self, key):
+        """
+        Call its parent function to remove an entry from the local hashtable.
+        :param key: key to remove in the local hashtable.
+        :return: True
+        """
         self.logger.debug("del")
         self.parent.rem(key)
         return True
-    
+
     def _message_handler(self, sock, addr):
+        """
+        Handle the message received by this server by parsing the messages and calling the corresponding action.
+        :param sock: socket to listen to new messages.
+        :param addr: address of the client sending messages.
+        :return: None
+        """
         try:
             sock.setblocking(0)
             self.socket_list.append(sock)
@@ -77,7 +108,7 @@ class DHTServer(Process):
         except KeyboardInterrupt as e:
             self.parent.terminate.value = 1
             sock.close()
-    
+
     def run(self):
         self.logger.info('Starting DHT server.')
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
@@ -103,6 +134,3 @@ class DHTServer(Process):
             self.parent.terminate.value = 1
         finally:
             self.listening_socket.close()
-
-
-    

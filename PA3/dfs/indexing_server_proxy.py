@@ -9,28 +9,56 @@ from socket import *
 
 logging.basicConfig(level=logging.DEBUG)
 
+
 class ISProxy():
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
     def init_connection(self, id):
+        """
+        Initialize the connection with an indexing server.
+        :param id: identifier of the peer.
+        :return:
+        """
         return
 
     @abc.abstractmethod
     def close_connection(self, id):
+        """
+        End the connection with an indexing server.
+        :param id: identifier of the peer.
+        :return:
+        """
         return
 
     @abc.abstractmethod
     def list(self):
+        """
+        List all the files stored in the indexing server.
+        :return: list of all the files available in the indexing server.
+        """
         return
 
     @abc.abstractmethod
     def register(self, id, name):
+        """
+        Register a given file to the indexing server.
+        :param id: identifier of the peer.
+        :param name: name of the file to register.
+        :return:
+        """
         return
 
     @abc.abstractmethod
     def search(self, id, name):
+        """
+        Search a file in the indexing server.
+        :param id: identifier of the peer.
+        :param name: name of the file to search.
+        :return: list of peers where the file is available.
+        """
         return
+
 
 class CentralizedISProxy(ISProxy):
     def __init__(self, sock):
@@ -64,10 +92,11 @@ class CentralizedISProxy(ISProxy):
         available_peers = self.exch.pkl_recv()
         return available_peers
 
+
 class DistributedISProxy(ISProxy):
     def __init__(self, parent):
         self.parent = parent
-        self.socket_map = [None]*self.parent.nodes_count
+        self.socket_map = [None] * self.parent.nodes_count
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.DEBUG)
 
@@ -79,7 +108,7 @@ class DistributedISProxy(ISProxy):
                 sock.connect((peer_ip, self.parent.port))
                 self.socket_map[server_id] = sock
             except error as e:
-                if e.errno == errno.ECONNREFUSED: # peer is not online
+                if e.errno == errno.ECONNREFUSED:  # peer is not online
                     self.logger.debug("Peer %s seems to be offline.", server_id)
                     self.socket_map[server_id] = False
         return self.socket_map[server_id]
@@ -108,7 +137,7 @@ class DistributedISProxy(ISProxy):
     def register(self, id, name):
         previous_value = self._get(name)
         self.logger.debug(repr(previous_value))
-        if previous_value is False: # nodes are offline
+        if previous_value is False:  # nodes are offline
             return False
         if previous_value is None:
             previous_value = []
@@ -121,11 +150,6 @@ class DistributedISProxy(ISProxy):
         if available_peers is not None and id in available_peers:
             available_peers.remove(id)
         return available_peers
-
-    # def _generic_action(self, action, key, args):
-    #     # hash key to get the server id
-    #     server_id = self.parent.server_hash(key)
-    #     return self._generic_action_sid(server_id, action, key, args)
 
     def _generic_action_sid(self, sid, action, args):
         self.logger.debug("%s %s %s", action, sid, self.parent.id)

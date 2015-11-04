@@ -1,5 +1,4 @@
-from multiprocessing import Process, Manager, Value, Lock
-import random
+from multiprocessing import Process, Manager, Value
 from select import select
 from socket import *
 
@@ -16,6 +15,11 @@ logger.setLevel(logging.INFO)
 
 class IndexingServer:
     def __init__(self, config):
+        """
+        Initialize the centralized indexing server.
+        :param config: configuration parameters given in a python dictionary
+        :return: None
+        """
         self.replica = config['replica']
         self.timeout_value = config['timeout_value']
         self.listening_ip = config['listening_ip']
@@ -41,6 +45,12 @@ class IndexingServer:
         }
 
     def _init_connection(self, exch, id):
+        """
+        Action called when a peer asked to initialize a connection to the indexing server.
+        :param exch: MessageExchanger object connected to the peer.
+        :param id: identifier of the peer.
+        :return: True
+        """
         self.logger.debug("ID: %s", id)
         peer_status = self.peer_status
         peer_status[id] = 1
@@ -50,15 +60,35 @@ class IndexingServer:
 
     # TODO: implement automatic unregistration of files
     def _close_connection(self, exch, id):
+        """
+        Action called when a given peer closes its connection with the indexing server.
+        :param exch: MessageExchanger object connected to the peer.
+        :param id: identifier of the peer.
+        :return: False
+        """
         return False
 
     def local_register(self, id, name):
+        """
+        Add the peer id in the set of peers that store the file name.
+        :param id: identifier of the peer.
+        :param name: name of the file to register.
+        :return: None
+        """
         # add to index
         peers_list = self.file2peers.get(name, set())
         peers_list.add(id)
         self.file2peers[name] = peers_list
 
     def _register(self, exch, id, name):
+        """
+        Register the file in the indexing server and compute the place where the registered file need to be copied
+        to ensure replication.
+        :param exch: MessageExchanger object connected to the peer.
+        :param id: identifier of the peer.
+        :param name: name of the file to register
+        :return: list of peers address and port where the file need to be replicated
+        """
         self.local_register(id, name)
         # send back the peers where he need to replicate this file
         self.logger.debug(self.peer_status)
@@ -78,10 +108,23 @@ class IndexingServer:
         return True
 
     def _list(self, exch):
+        """
+        List all the files available in the indexing server.
+        :param exch: MessageExchanger object connected to the peer.
+        :return: True
+        """
         exch.pkl_send(self.file2peers.keys())
         return True
 
     def _search(self, exch, id, name):
+        """
+        Search a given file name in the indexing server and send to the peer a list of all the peers where this file
+        is available.
+        :param exch: MessageExchanger object connected to the peer.
+        :param id: identifier of the peer.
+        :param name: name of the file to search.
+        :return: True
+        """
         to_return = []
         if name in self.file2peers:
             # return ids of the peers that have this file
@@ -90,6 +133,11 @@ class IndexingServer:
         return True
 
     def _generic_action(self, action):
+        """
+        Action parser that call the correct method given an action passed as a python dictionary.
+        :param action: dictionary describing the action to execute.
+        :return: None
+        """
         t = action['type']
         self.logger.debug('Action type: %s', (t))
         if t in self.actions:
@@ -98,6 +146,12 @@ class IndexingServer:
         return None
 
     def _message_handler(self, client_sock, client_addr):
+        """
+        Function that handles the message sent by a peer to the indexing server.
+        :param client_sock: socket connected to the peer.
+        :param client_addr: address of the peer.
+        :return: None
+        """
         self.logger.info("Accepted connection from %s", (client_addr))
 
         read_list = [client_sock]
@@ -115,11 +169,12 @@ class IndexingServer:
         client_sock.close()
 
     def run(self):
-        """Main function. It handles the connection from peers to the indexing
+        """
+        Main function. It handles the connection from peers to the indexing
         server. Everytime a peer connects to the server, a new socket
         is spawned to handle the communication with this specific
         peer. Once the communication is over, this socket is closed.
-
+        :return None
         """
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
         self.listening_socket.setblocking(0)

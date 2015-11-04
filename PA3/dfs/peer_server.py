@@ -1,33 +1,46 @@
 import logging
-from multiprocessing import Process
 import os
+
+from multiprocessing import Process
 from socket import *
 from CommunicationProtocol import MessageExchanger
 from select import select
 
 logging.basicConfig(level=logging.DEBUG)
 
+
 class PeerServer(Process):
     def __init__(self, parent):
+        """
+        Initialize the PeerServer object.
+        :param parent: Node object.
+        :return: None
+        """
         super(PeerServer, self).__init__()
 
         self.parent = parent
         self.socket = None
         self.logger = logging.getLogger(self.__class__.__name__)
-        level = logging.getLevelName(parent.config.get('log', 'INFO'))
+        level = logging.getLevelName(parent.log_level)
         self.logger.setLevel(level)
         self.actions = {
             'obtain': self._obtain,
             'replicate': self._recv_replica
         }
-        self.ip = parent.this_ip
-        self.port = parent.config['file_server_port']
+        self.ip = parent.ip
+        self.port = parent.file_server_port
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
         self.listening_socket.setblocking(0)
         self.listening_socket.bind(("0.0.0.0", self.port))
-        self.listening_socket.listen(parent.config['max_connections'])
+        self.listening_socket.listen(parent.max_connections)
 
     def _obtain(self, name, exch):
+        """
+        Action executed when a peer ask for a file. Acknowledge the request and then send the file.
+        :param name: name of the file requested.
+        :param exch: MessageExchanger with the peer that made the request.
+        :return: False
+        """
         try:
             fpath = self.parent.local_files[name]
             exch.pkl_send(True)
@@ -38,20 +51,37 @@ class PeerServer(Process):
             return False
 
     def _recv_replica(self, exch, name):
+        """
+        Action executed when another peer pushes a replica to this peer.
+        :param name: name of the file requested.
+        :param exch: MessageExchanger with the peer that made the request.
+        :return: False
+        """
         local_files = self.parent.local_files
         fpath = os.path.join(self.parent.download_dir, name)
         local_files[name] = os.path.abspath(fpath)
         self.parent.local_files = local_files
         exch.file_recv(fpath, show_progress=False)
         return False
-    
+
     def _generic_action(self, action):
+        """
+        Parse the action given as a parameter and call the corresponding function.
+        :param action: action to call passed as a python dictionary.
+        :return: result of the method called.
+        """
         t = action['type']
         if t in self.actions:
             kwargs = {k: action[k] for k in action.keys() if k != 'type'}
             return self.actions[t](**kwargs)
-            
+
     def _peer_message_handler(self, peer_sock, peer_addr):
+        """
+        Handle messages sent by another peer.
+        :param peer_sock: socket to communicate with the other peer.
+        :param peer_addr: address of the other peer.
+        :return: None
+        """
         self.logger.debug("Accepted connection from %s", peer_addr)
         peer_exch = MessageExchanger(peer_sock)
 
@@ -64,9 +94,9 @@ class PeerServer(Process):
         peer_sock.close()
 
     def run(self):
-        """This function handles the connection from other peer to obtain
-        files.
-        
+        """
+        This function handles the connection from other peer to obtain files.
+        :return: None
         """
         self.logger.debug("Peer server listening on port %d", self.port)
 
@@ -83,6 +113,6 @@ class PeerServer(Process):
                     handler.daemon = True
                     handler.start()
         except KeyboardInterrupt:
-                pass
+            pass
         finally:
             self.listening_socket.close()

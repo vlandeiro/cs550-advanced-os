@@ -10,10 +10,12 @@ Usage:
    ./gen_config.py peer server_ip server_port [listening_port=P] [max_connections=S] [download_dir=D]
 """
 
+
 def print_err(msg):
     sys.stderr.write("Error: %s\n" % msg)
     sys.stderr.write("%s\n" % doc.strip())
     sys.exit(1)
+
 
 if __name__ == '__main__':
     args = sys.argv
@@ -22,7 +24,7 @@ if __name__ == '__main__':
     conf_type = args[1]
     if conf_type not in ['peer', 'server']:
         print_err("Error: second argument should be 'peer' or 'server'.")
-    
+
     types_dict = {
         "listening_port": int,
         "max_connections": int,
@@ -45,7 +47,7 @@ if __name__ == '__main__':
         template_conf['idxserv_ip'] = args[2]
         template_conf['idxserv_port'] = int(args[3])
         opt_args = args[4:]
-    else: # conf_type == 'server'
+    else:  # conf_type == 'server'
         opt_args = args[3:]
 
     for arg in opt_args:
@@ -54,9 +56,8 @@ if __name__ == '__main__':
             template_conf[arg_name] = types_dict[arg_name](arg_val)
         else:
             print_err("Wrong argument: %s" % arg)
-            
+
     ip = json.load(urlopen('https://api.ipify.org/?format=json'))['ip']
     template_conf['listening_ip'] = str(ip)
 
     print json.dumps(template_conf, indent=4, separators=(',', ': '))
-    

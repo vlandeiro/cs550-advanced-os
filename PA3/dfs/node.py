@@ -11,16 +11,18 @@ from peer_client import PeerClient
 from peer_server import PeerServer
 
 logging.basicConfig(level=logging.DEBUG)
-    
-class Peer:
-    def __init__(self, config):
-        # set up logger
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.DEBUG)
 
+
+class Node:
+    def __init__(self, config):
+        """
+        Initialize a node given parameters.
+        :param config: paramaters to set up the node given as a python dictionary.
+        :return: None
+        """
         # read and parse configuration
         self.config = config
-        self.idx_type = config['idx_type'] # centralized or distributed
+        self.idx_type = config['idx_type']  # centralized or distributed
 
         # configuration parameters shared by both implementations
         self.download_dir = os.path.abspath(config['download_dir'])
@@ -32,17 +34,25 @@ class Peer:
         self.timeout_value = config['timeout_value']
         self.max_connections = config['max_connections']
 
+        # set up logger
+        self.logger = logging.getLogger(self.__class__.__name__)
+        level = logging.getLevelName(self.log_level)
+        self.logger.setLevel(level)
+
+        # configuration when the indexing server is distributed
         if self.idx_type == 'distributed':
             self.nodes_list = config['nodes']
             self.nodes_count = len(self.nodes_list)
             self.replica = config['replica']
             # get this server info from config file
-            self.this_ip = str(json.load(urlopen('https://api.ipify.org/?format=json'))['ip'])
-            if self.this_ip not in self.nodes_list:
-                raise ValueError("peer %s is not included in the config file." % self.this_ip)
-            self.id = self.nodes_list.index(self.this_ip)
+            self.ip = str(json.load(urlopen('https://api.ipify.org/?format=json'))['ip'])
+            if self.ip not in self.nodes_list:
+                raise ValueError("peer %s is not included in the config file." % self.ip)
+            self.id = self.nodes_list.index(self.ip)
+        else:
+            self.idx_server_ip = config['idx_server_ip']
 
-        # create shared dictionary to store the paths to the local files
+        # create shared dictionary to store the local paths to the registered files
         self.manager = Manager()
         self.local_files = self.manager.dict()
         self.terminate = Value('i', 0)
@@ -54,17 +64,18 @@ class Peer:
             self.dht = DHT(config, self.terminate)
 
     def run(self):
-        """Function that launches the different parts (server, user interface,
-        client, file management, ...) of the peer.
-
+        """
+        Launch the different pieces of this node: distributed indexing server if requested, file server, and user
+        interface.
+        :return: None
         """
         try:
             # First, start the file server in a dedicated thread.
             self.file_server.start()
             # After that, run the indexing server if the config is set to distributed
             if self.idx_type == 'distributed':
-               self.dht.server.start()
-            
+                self.dht.server.start()
+
             # Then, start the user interface
             self.logger.debug("Starting the user interface.")
             self.client.run()
@@ -77,19 +88,11 @@ class Peer:
         except:
             raise
 
-def format_filesize(f_size):
-    prefixes = ['', 'K', 'M', 'G', 'T', 'P']
-    # change file size to human readable
-    for prefix in prefixes:
-        if f_size < 1024:
-            break
-        f_size = 1.*f_size/1024.
-    f_size_str = "%.1f%sB" % (f_size, prefix)
-    return f_size_str
 
 def print_usage(args):
     print("Usage: python %s config.json" % args[0])
     sys.exit(1)
+
 
 if __name__ == '__main__':
     # parse arguments
@@ -98,6 +101,6 @@ if __name__ == '__main__':
         print_usage(args)
     with open(args[1]) as config_fd:
         run_args = json.load(config_fd)
-        
-    peer = Peer(run_args)
+
+    peer = Node(run_args)
     peer.run()

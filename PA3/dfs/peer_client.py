@@ -1,10 +1,11 @@
 import glob
 import logging
-from multiprocessing import Process
 import random
 import time
 import os
 import sys
+
+from multiprocessing import Process
 from socket import *
 from CommunicationProtocol import MessageExchanger
 from indexing_server_proxy import CentralizedISProxy, DistributedISProxy
@@ -19,22 +20,26 @@ def sample_with_replacement(l, k):
     else:
         return []
 
+
 class PeerClient(Process):
     def __init__(self, parent):
-        self.idxserv_port = parent.idx_server_port
-        self.ip = parent.this_ip
-        port = parent.config['file_server_port']
-        self.download_dir = parent.config['download_dir']
-        self.max_connections = parent.config['max_connections']
+        """
+            Initialize the user interface using the configuration stored in its parent.
+            :param parent: Node object.
+            :return: None
+            """
+        super(PeerClient, self).__init__()
         self.parent = parent
+        self.idx_server_port = parent.idx_server_port
+        self.ip = parent.ip
+        self.download_dir = parent.download_dir
+        self.max_connections = parent.max_connections
+        self.id = ":".join([self.ip, str(parent.file_server_port)])
         self.logger = logging.getLogger(self.__class__.__name__)
-        level = logging.getLevelName(parent.config.get('log', 'INFO'))
+        level = logging.getLevelName(parent.log_level)
         self.logger.setLevel(level)
-
-        self.id = ":".join([self.ip, str(port)])
-        self.idxserv_sock = None
-        self.idxserv_proxy = None
-
+        self.idx_server_sock = None
+        self.idx_server_proxy = None
         self.actions = {
             'exit': self._exit,
             'lookup': self._lookup,
@@ -46,11 +51,21 @@ class PeerClient(Process):
         }
 
     def _exit(self):
+        """
+        Set the terminate shared variable to 1 to exit all the running processes.
+        :return: True, None
+        """
         self.parent.terminate.value = 1
         return True, None
 
-    def _lookup(self, filename):
-        _, available_peers = self._search(filename)
+    def _lookup(self, name):
+        """
+        Search for peers where a given file is stored and then request these peers for the file until the file
+        is entirely stored locally.
+        :param name: name of the file to obtain.
+        :return: False, False
+        """
+        _, available_peers = self._search(name)
         file_obtained = False
         while not file_obtained and available_peers:
             peer = available_peers.pop(0)
@@ -63,9 +78,9 @@ class PeerClient(Process):
             try:
                 peer_sock.connect(conn_param)
                 peer_exch = MessageExchanger(peer_sock)
-                peer_action = dict(type='obtain', name=filename)
+                peer_action = dict(type='obtain', name=name)
                 peer_exch.pkl_send(peer_action)
-                filepath = os.path.join(self.download_dir, filename)
+                filepath = os.path.join(self.download_dir, name)
                 file_exists = peer_exch.pkl_recv()
                 if file_exists:
                     peer_exch.file_recv(filepath, show_progress=False)
@@ -80,7 +95,13 @@ class PeerClient(Process):
         return False, False
 
     def _search(self, name, pprint=True):
-        available_peers = self.idxserv_proxy.search(self.id, name)
+        """
+        Request all the peers where a given file is available.
+        :param name: name of the file to search for.
+        :param pprint: if True, then the peers are printed in a "pretty format".
+        :return: False, list of peers where this file is stored.
+        """
+        available_peers = self.idx_server_proxy.search(self.id, name)
 
         if pprint:
             if available_peers == []:
@@ -91,18 +112,23 @@ class PeerClient(Process):
                     print "\t- %s" % p
         return False, available_peers
 
-    def _register(self, filename):
-        if not os.path.isfile(filename):
-            print("Error: %s does not exist or is not a file." % filename)
+    def _register(self, f_path):
+        """
+        Register a given file to the indexing server.
+        :param f_path: path to the file to register.
+        :return: False, True if replication has been done or False otherwise.
+        """
+        if not os.path.isfile(f_path):
+            print("Error: %s does not exist or is not a file." % f_path)
             return False, False
 
         # Register to the indexing server
-        name = os.path.basename(filename)
-        replicate_to = self.idxserv_proxy.register(self.id, name)
+        name = os.path.basename(f_path)
+        replicate_to = self.idx_server_proxy.register(self.id, name)
 
         # Register locally
         local_files = self.parent.local_files
-        local_files[name] = os.path.abspath(filename)
+        local_files[name] = os.path.abspath(f_path)
         self.parent.local_files = local_files
 
         # Replicate files
@@ -118,14 +144,19 @@ class PeerClient(Process):
                     peer_exch = MessageExchanger(peer_sock)
                     peer_action = dict(type='replicate', name=name)
                     peer_exch.pkl_send(peer_action)
-                    peer_exch.file_send(filename)
+                    peer_exch.file_send(f_path)
                 except timeout:  # peer unreachable
                     continue
-        
+
         ret = True if replicate_to else False
         return False, ret
 
     def _local_ls(self, regex="./*"):
+        """
+        Print a list of local files matched by a given regular expression.
+        :param regex: regular expression to match files.
+        :return: False, None
+        """
         ls = glob.glob(regex)
         sizes = [os.path.getsize(f) for f in ls]
         for name, size in zip(ls, sizes):
@@ -133,13 +164,22 @@ class PeerClient(Process):
         return False, None
 
     def _ls(self, pprint=True):
-        available_files = self.idxserv_proxy.list()
+        """
+        List all the files available in the indexing server.
+        :param pprint: if True, print one file name per line.
+        :return: False, list of all available files.
+        """
+        available_files = self.idx_server_proxy.list()
         if pprint != False:
             for f in available_files:
                 print f
         return False, available_files
 
     def _display_help(self):
+        """
+        Show the commands available to the user.
+        :return: False, True
+        """
         help_ui = {
             'exit': 'Shut down this peer.',
             'lookup': 'Download a given file from an available peer.',
@@ -157,15 +197,25 @@ class PeerClient(Process):
     def _init_connection(self):
         """
         Initialize the connection with the indexing server.
-        :return:
+        :return: False, None
         """
-        self.idxserv_proxy.init_connection(self.id)
+        self.idx_server_proxy.init_connection(self.id)
         return False, None
 
     def close_connection(self):
-        self.idxserv_proxy.close_connection(self.id)
+        """
+        Close the connection with the indexing server.
+        :return: None
+        """
+        self.idx_server_proxy.close_connection(self.id)
 
     def do(self, action, args):
+        """
+        Generic function that parse a given action and call the corresponding methods with the given arguments.
+        :param action: action to execute.
+        :param args: arguments to pass to the method associated with the action.
+        :return: result of the action called.
+        """
         if action not in self.actions.keys():
             print "Error: unvalid command '%s'" % " ".join([action] + args)
             print "Use the help command to get more informations."
@@ -177,24 +227,35 @@ class PeerClient(Process):
                 raise
         return False, False
 
-    def run(self):
-        """This function handles the user input and the connections to the
-        indexing server and the other peers.
+    def _idx_server_connect(self):
         """
-        # Start by connecting to the Indexing Server
+        Connect to the indexing server and set up the indexing server proxy.
+        :return: None
+        """
         try:
             if self.parent.idx_type == 'centralized':
-                self.idxserv_sock = socket(AF_INET, SOCK_STREAM)
-                self.idxserv_sock.connect((self.idxserv_ip, self.idxserv_port))
-                self.idxserv_proxy = CentralizedISProxy(self.idxserv_sock)
+                self.idx_server_sock = socket(AF_INET, SOCK_STREAM)
+                self.idx_server_sock.connect((self.parent.idx_server_ip, self.idx_server_port))
+                self.idx_server_proxy = CentralizedISProxy(self.idx_server_sock)
             else:
-                self.idxserv_proxy = DistributedISProxy(self.parent.dht)
+                self.idx_server_proxy = DistributedISProxy(self.parent.dht)
             self._init_connection()
         except error as e:
             if e.errno == errno.ECONNREFUSED:
-                self.logger.error("Connection refused by the Indexing Server. Are you sure the Indexing Server is running?")
+                self.logger.error(
+                    "Connection refused by the Indexing Server. Are you sure the Indexing Server is running?")
                 sys.exit(1)
 
+    def run(self):
+        """
+        Handle the user input and the connections to the indexing server and the other peers.
+        :return: None
+        """
+
+        # Start by connecting to the Indexing Server
+        self._idx_server_connect()
+
+        # Run the user interface
         terminate = False
         try:
             while not terminate:
@@ -216,4 +277,4 @@ class PeerClient(Process):
         finally:
             self.parent.terminate.value = 1
             self.close_connection()
-            self.idxserv_proxy.close_connection(self.id)
+            self.idx_server_proxy.close_connection(self.id)
