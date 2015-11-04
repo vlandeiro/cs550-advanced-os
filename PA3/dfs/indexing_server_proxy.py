@@ -146,15 +146,17 @@ class DistributedISProxy(ISProxy):
         self._put(name, previous_value)
 
         other_peers = self.parent.nodes_list
-        other_peers.pop(id)
+        other_peers.pop(self.parent.id)
         other_peers = [":".join([x, str(self.parent.config['file_server_port'])]) for x in other_peers]
         nb_replica = self.parent.replica
         if nb_replica == 0:
-            return []
+            replicate_to = []
         elif len(other_peers) < nb_replica:
-            return other_peers
+            replicate_to = other_peers
         else:
-            return np.random.choice(other_peers, nb_replica)
+            replicate_to = np.random.choice(other_peers, nb_replica)
+        self.logger.debug("Replicate to: %s", str(replicate_to))
+        return replicate_to
 
     def search(self, id, name):
         available_peers = self._get(name)
