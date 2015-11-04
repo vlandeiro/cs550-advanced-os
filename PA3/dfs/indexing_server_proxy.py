@@ -135,7 +135,7 @@ class DistributedISProxy(ISProxy):
                 ls |= set(res)
         return list(ls)
 
-    def _local_register(id, name):
+    def _local_register(self, id, name):
         previous_value = self._get(name)
         self.logger.debug(repr(previous_value))
         if previous_value is False:  # nodes are offline
