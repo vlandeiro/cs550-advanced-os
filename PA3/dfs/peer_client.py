@@ -107,21 +107,23 @@ class PeerClient(Process):
 
         # Replicate files
         self.logger.debug("Replicate to %s", replicate_to)
-        for peer in replicate_to:
-            addr, port = peer.split(':')
-            port = int(port)
-            conn_param = (addr, port)
-            peer_sock = socket(AF_INET, SOCK_STREAM)
-            try:
-                peer_sock.connect(conn_param)
-                peer_exch = MessageExchanger(peer_sock)
-                peer_action = dict(type='replicate', name=name)
-                peer_exch.pkl_send(peer_action)
-                peer_exch.file_send(filename)
-            except timeout:  # peer unreachable
-                continue
-
-        return False, True
+        if replicate_to:
+            for peer in replicate_to:
+                addr, port = peer.split(':')
+                port = int(port)
+                conn_param = (addr, port)
+                peer_sock = socket(AF_INET, SOCK_STREAM)
+                try:
+                    peer_sock.connect(conn_param)
+                    peer_exch = MessageExchanger(peer_sock)
+                    peer_action = dict(type='replicate', name=name)
+                    peer_exch.pkl_send(peer_action)
+                    peer_exch.file_send(filename)
+                except timeout:  # peer unreachable
+                    continue
+        
+        ret = True if replicate_to else False
+        return False, ret
 
     def _local_ls(self, regex="./*"):
         ls = glob.glob(regex)

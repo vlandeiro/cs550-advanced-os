@@ -11,7 +11,7 @@ BUFFER_SIZE = 4096
 logging.basicConfig(level=logging.DEBUG)
 
 class MessageExchanger:
-    def __init__(self, sock, log='DEBUG'):
+    def __init__(self, sock, log='INFO'):
         self.sock = sock
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLevelName(log))

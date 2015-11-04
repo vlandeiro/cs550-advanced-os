@@ -97,6 +97,7 @@ class DistributedISProxy(ISProxy):
                 sock = self.get_peer_sock(sid)
                 if not sock:
                     continue
+                self.logger.debug(repr(sock))
                 exch = MessageExchanger(sock)
                 dht_action = dict(action="keys", args=[])
                 exch.pkl_send(dht_action)
@@ -105,15 +106,15 @@ class DistributedISProxy(ISProxy):
         return list(ls)
 
     def register(self, id, name):
-        previous_peers = self._get(name)
-        if previous_peers is False: # nodes are offline
+        previous_value = self._get(name)
+        self.logger.debug(repr(previous_value))
+        if previous_value is False: # nodes are offline
             return False
-        if previous_peers is None:
-            previous_peers = []
-        previous_peers.append(id)
-        self._put(name, previous_peers)
-        # TODO: file replication and metadata replication
-        return []
+        if previous_value is None:
+            previous_value = []
+        previous_value.append(id)
+        self._put(name, previous_value)
+        return previous_value
 
     def search(self, id, name):
         available_peers = self._get(name)
@@ -127,14 +128,17 @@ class DistributedISProxy(ISProxy):
     #     return self._generic_action_sid(server_id, action, key, args)
 
     def _generic_action_sid(self, sid, action, args):
-        sys.stderr.write("%s\n" % action)
-        # if local call parent, else call or connect to server
+        self.logger.debug("%s %s %s", action, sid, self.parent.id)
+        # if local, call parent
         if sid == self.parent.id:
+            self.logger.debug("Local function call")
             method = getattr(self.parent, action)
             res = method(*args)
         else:
+            self.logger.debug("Network function call")
             sock = self.get_peer_sock(sid)
-            if sock is None:
+            self.logger.debug(repr(sock))
+            if not sock:
                 return False
             exch = MessageExchanger(sock)
             dht_action = dict(action=action, args=args)
@@ -153,9 +157,11 @@ class DistributedISProxy(ISProxy):
         sid_replica = (sid + 1) % self.parent.nodes_count
         sids = [sid, sid_replica]
         obtained = False
-        while not obtained and sids:
+        while obtained == False and sids:
             sid = sids.pop(0)
-            obtained = self._generic_action_sid(sid,"get", [key])
+            obtained = self._generic_action_sid(sid, "get", [key])
+            self.logger.debug("obtained: %s", repr(obtained))
+        return obtained
 
     def _del(self, key):
         sid = self.parent.server_hash(key)
