@@ -15,11 +15,11 @@ if __name__ == '__main__':
     if len(args) != 4:
         print_usage(args)
         sys.exit(1)
-    id_inst = args[1]
+    id_inst = int(args[1])
     config_path = args[2]
     ssh_key_path = args[3]
     
     with open(config_path) as config_fd:
         config = json.load(config_fd)
-    connect(config[id_inst], ssh_key_path)
+    connect(config['nodes'][id_inst], ssh_key_path)
     

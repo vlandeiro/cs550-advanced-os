@@ -2,6 +2,7 @@ import abc
 import sys
 import errno
 import logging
+import numpy as np
 
 from hashlib import md5
 from CommunicationProtocol import *
@@ -143,7 +144,17 @@ class DistributedISProxy(ISProxy):
             previous_value = []
         previous_value.append(id)
         self._put(name, previous_value)
-        return previous_value
+
+        other_peers = self.parent.nodes_list
+        other_peers.pop(id)
+        other_peers = [":".join([x, str(self.parent.config['file_server_port'])]) for x in other_peers]
+        nb_replica = self.parent.replica
+        if nb_replica == 0:
+            return []
+        elif len(other_peers) < nb_replica:
+            return other_peers
+        else:
+            return np.random.choice(other_peers, nb_replica)
 
     def search(self, id, name):
         available_peers = self._get(name)
