@@ -178,7 +178,7 @@ class IndexingServer:
         self.listening_socket.setblocking(0)
         self.listening_socket.bind(("0.0.0.0", self.idx_server_port))
         self.listening_socket.listen(self.max_connections)
-        logger.info("Indexing server listening on port %d.", self.idx_server_port)
+        self.logger.info("Indexing server listening on port %d.", self.idx_server_port)
 
         read_list = [self.listening_socket]
         try:
@@ -191,7 +191,7 @@ class IndexingServer:
                     handler.start()
         except KeyboardInterrupt:
             sys.stderr.write("\r")
-            logger.info("Shutting down Indexing Server.")
+            self.logger.info("Shutting down Indexing Server.")
         finally:
             self.terminate.value = 1
             self.listening_socket.close()
