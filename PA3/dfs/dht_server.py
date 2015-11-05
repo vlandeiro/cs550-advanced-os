@@ -119,7 +119,7 @@ class DHTServer(Process):
         read_list = [self.listening_socket]
         try:
             while True:
-                readable, _, _ = select(read_list, [], [], 0.1)
+                readable, _, _ = select(read_list, [], [], self.parent.timeout_value)
                 if self.parent.terminate.value == 1:
                     break
                 elif readable:

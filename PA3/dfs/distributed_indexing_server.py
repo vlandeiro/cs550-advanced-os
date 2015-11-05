@@ -24,6 +24,7 @@ class DHT():
 
         self.nodes_list = config['nodes']
         self.nodes_count = len(self.nodes_list)
+        self.timeout_value = config['timeout_value']
 
         # get this server info from config file
         self.nodes_list = config['nodes']

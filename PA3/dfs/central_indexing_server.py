@@ -20,8 +20,7 @@ class IndexingServer:
         """
         self.replica = config['replica']
         self.timeout_value = config['timeout_value']
-        self.listening_ip = config['listening_ip']
-        self.listening_port = config['listening_port']
+        self.idx_server_port = config['idx_server_port']
         self.max_connections = config['max_connections']
 
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -177,9 +176,9 @@ class IndexingServer:
         """
         self.listening_socket = socket(AF_INET, SOCK_STREAM)
         self.listening_socket.setblocking(0)
-        self.listening_socket.bind(("0.0.0.0", self.listening_port))
+        self.listening_socket.bind(("0.0.0.0", self.idx_server_port))
         self.listening_socket.listen(self.max_connections)
-        logger.info("Indexing server listening on port %d", self.listening_port)
+        logger.info("Indexing server listening on port %d.", self.idx_server_port)
 
         read_list = [self.listening_socket]
         try:
