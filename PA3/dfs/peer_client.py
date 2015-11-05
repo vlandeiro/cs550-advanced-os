@@ -66,7 +66,7 @@ class PeerClient(Process):
         _, all_files = self._ls(pprint=False)
         if cmd in ['search', 'lookup']:
             files = [f for f in all_files if not re.match('f.*%s' % self.ip, f)]
-            files = np.random.choice(files, 100, replace=False)
+            files = np.random.choice(files, 10000, replace=False)
         else:
             files = glob.glob('../benchmark_files/exp1/*')
         results = []
