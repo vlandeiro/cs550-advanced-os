@@ -15,7 +15,7 @@ def files_exp1(): # around 10 seconds
     block_1K = "0"*1024
     nb_files = 10**4
     for i in xrange(nb_files):
-        fname = "exp1/f%06d_%s" % (i, ip)
+        fname = "exp1/f%04d_%s" % (i, ip)
         with open(fname, 'wb') as fd:
             fd.write(block_1K)
     delta = time() - t0
@@ -35,7 +35,7 @@ def files_exp2():
         sys.stdout.flush()
         t0 = time()
         for fi in xrange(fc):
-            fname = "exp2/f%d_%06d_%s" % (k, fi, ip)
+            fname = "exp2/f%d_%04d_%s" % (k, fi, ip)
             with open(fname, "wb") as fd:
                 for fb in xrange(bc):
                     fd.write(b)
