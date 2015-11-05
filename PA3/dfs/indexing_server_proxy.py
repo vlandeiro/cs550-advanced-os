@@ -146,7 +146,9 @@ class DistributedISProxy(ISProxy):
         self._put(name, previous_value, replicate=replicate)
 
     def register(self, id, name):
-        self._local_register(id, name)
+        ret = self._local_register(id, name)
+        if ret is False:
+            return False
         other_peers = copy.copy(self.parent.nodes_list)
         other_peers.pop(self.parent.id)
         other_peers = [":".join([x, str(self.parent.config['file_server_port'])]) for x in other_peers]
@@ -164,7 +166,7 @@ class DistributedISProxy(ISProxy):
 
     def search(self, id, name):
         available_peers = self._get(name)
-        if available_peers is not None and id in available_peers:
+        if available_peers and id in available_peers:
             available_peers.remove(id)
         return available_peers
 

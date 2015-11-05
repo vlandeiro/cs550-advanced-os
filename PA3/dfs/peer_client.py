@@ -154,7 +154,9 @@ class PeerClient(Process):
         available_peers = self.idx_server_proxy.search(self.id, name)
 
         if pprint:
-            if available_peers == []:
+            if available_peers is False:
+                print("Other peers are offline.")
+            elif available_peers == []:
                 print("File unavailable in other peers.")
             elif available_peers is not None:
                 print("File available at the following peers:")
@@ -184,6 +186,10 @@ class PeerClient(Process):
         # Register to the indexing server
         name = os.path.basename(f_path)
         replicate_to = self.idx_server_proxy.register(self.id, name)
+
+        if replicate_to == False:
+            self.logger.debug("Main node and replica are done for metadata.")
+            return False, False
 
         # Register locally
         local_files = self.parent.local_files
