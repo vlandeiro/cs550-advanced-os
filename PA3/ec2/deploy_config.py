@@ -32,8 +32,11 @@ default_centralized_idx_server = {
     'timeout_value': 0.3,
     'idx_server_port': 5000
 }
+
+
 def print_usage(args):
     print("Usage: python %s (centralized|distributed) credentials.csv ssh_key.pem" % args[0])
+
 
 def get_running_instances(access_id, secret_key):
     conn = boto.ec2.connect_to_region("us-west-2",
@@ -45,15 +48,16 @@ def get_running_instances(access_id, secret_key):
         for instance in reservation.instances:
             if instance.state == 'running':
                 instances.append(instance)
-    return instances
+    return conn, instances
+
 
 def deploy_centralized_config(access_id, secret_key, ssh_key_file):
     print("Start creation of config file.")
     config_peer = default_centralized_peer
     config_idx_server = default_centralized_idx_server
-    
+
     # getting instances
-    instances = get_running_instances(access_id, secret_key)
+    conn, instances = get_running_instances(access_id, secret_key)
 
     # define first instance as the indexing server and copy configuration
     print("Configure central indexing server.")
@@ -77,16 +81,17 @@ def deploy_centralized_config(access_id, secret_key, ssh_key_file):
         print("Copy configuration file to %s." % inst.ip_address)
         cmd = "scp -q -i %s config_peer.json ubuntu@%s:/home/ubuntu/cs550-advanced-os/PA3/dfs/config.json" % (ssh_key_file, inst.ip_address)
         call(cmd.split())
-    
+    conn.close()
+
 def deploy_distributed_config(access_id, secret_key, ssh_key_file):
     print("Start creation of config file.")
     config = default_distributed
-    instances = get_running_instances(access_id, secret_key)
+    conn, instances = get_running_instances(access_id, secret_key)
     nodes_list = []
     node_id = 0
     for inst in instances:
-        nodes_list.append(instance.ip_address)
-        instance.add_tag("Name", "DFSNode_%d" % node_id)
+        nodes_list.append(inst.ip_address)
+        inst.add_tag("Name", "DFSNode_%d" % node_id)
         node_id += 1
     config['nodes'] = nodes_list
     with open("config.json", "w") as config_fd:
@@ -95,9 +100,11 @@ def deploy_distributed_config(access_id, secret_key, ssh_key_file):
     print("Start deploying config file.")
     for inst in instances:
         print("Copy configuration file to %s" % inst.ip_address)
-        cmd = "scp -q -i %s config.json ubuntu@%s:/home/ubuntu/cs550-advanced-os/PA3/dfs/config.json" % (ssh_key_file, inst.ip_address)
+        cmd = "scp -q -i %s config.json ubuntu@%s:/home/ubuntu/cs550-advanced-os/PA3/dfs/config.json" % (
+        ssh_key_file, inst.ip_address)
         call(cmd.split())
-    
+    conn.close()
+
 if __name__ == '__main__':
     args = sys.argv
     if len(args) != 4:
@@ -107,11 +114,11 @@ if __name__ == '__main__':
         credentials_fd.readline()
         username, access_id, secret_key = credentials_fd.readline().strip().split(",")
     conf_type = args[1]
-    ssh_key_file = args[2]
+    ssh_key_file = args[3]
     if conf_type not in ['centralized', 'distributed']:
-        raise AttributeError('Configuration cannot be deployed with type = %s. Must be centralized or distributed.' % conf_type)
+        raise AttributeError(
+            'Configuration cannot be deployed with type = %s. Must be centralized or distributed.' % conf_type)
     elif conf_type == 'centralized':
         deploy_centralized_config(access_id, secret_key, ssh_key_file)
     else:
         deploy_distributed_config(access_id, secret_key, ssh_key_file)
-    
