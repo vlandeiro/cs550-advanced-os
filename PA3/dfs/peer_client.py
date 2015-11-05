@@ -274,7 +274,6 @@ class PeerClient(Process):
                 return self.actions[action](*args)
             except TypeError as e:
                 self.logger.error(e.message)
-                raise
         return False, False
 
     def _idx_server_connect(self):
@@ -308,8 +307,8 @@ class PeerClient(Process):
 
         # Run the user interface
         terminate = False
-        try:
-            while not terminate:
+        while not terminate:
+            try:
                 sys.stdout.write("$> ")
                 sys.stdout.flush()
 
@@ -323,9 +322,10 @@ class PeerClient(Process):
 
                 terminate, res = self.do(action, args)
                 print res
-        except KeyboardInterrupt as e:
-            sys.stderr.write("\r\n")
-        finally:
-            self.parent.terminate.value = 1
-            self.close_connection()
-            self.idx_server_proxy.close_connection(self.id)
+            except KeyboardInterrupt as e:
+                sys.stderr.write("\r\n")
+            except EOFError:
+                self.parent.terminate.value = 1
+                self.close_connection()
+                self.idx_server_proxy.close_connection(self.id)
+                break
