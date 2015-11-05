@@ -1,8 +1,6 @@
 #!/usr/bin/python
 import json
 from subprocess import call
-from urllib2 import urlopen
-
 
 if __name__ == '__main__':
     config_path = 'dfs/config.json'

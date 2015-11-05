@@ -7,6 +7,7 @@ import sys
 import errno
 import re
 
+from collections import Counter
 from multiprocessing import Process
 from socket import *
 from CommunicationProtocol import MessageExchanger
@@ -62,11 +63,14 @@ class PeerClient(Process):
         if cmd not in bench_map.keys():
             raise AttributeError("%s not supported for benchmark. Should be one of %s" % (cmd, bench_map.keys()))
         files = glob.glob('../benchmark_files/exp1/*')
+        results = []
         t0 = time.time()
         for f in files:
-            bench_map[cmd](f)
+            _, ret = bench_map[cmd](f)
+            results.append(ret)
         delta = time.time() - t0
         self.logger.info('Benchmark %s took %.3f seconds.', cmd, delta)
+        return Counter(results)
 
     def _benchmark2(self, file_size):
         bench_map = ['1K', '10K', '100K', '1M', '10M', '100M', '1G']
@@ -77,21 +81,24 @@ class PeerClient(Process):
         _, all_files = self._ls(pprint=False)
         files = [f for f in all_files if re.match('f%d*' % idx, f)]
         self.logger.info('%d files to lookup.' % len(files))
+        results = []
         t0 = time.time()
         for f in files:
-            self._lookup(f)
+            _, ret = self._lookup(f)
+            results.append(ret)
         delta = time.time() - t0
         self.logger.info('Benchmark to obtain files of size %s took %.3f seconds.', file_size, delta)
+        return Counter(results)
 
     def _benchmark(self, exp, cmd):
         try:
             exp_num = int(exp)
             bench_meth = getattr(self, "_benchmark%d" % exp_num)
-            bench_meth(cmd)
+            results = bench_meth(cmd)
         except (AttributeError, ValueError) as e:
             self.logger.error(e)
             return False, False
-        return False, True
+        return False, results
 
     def _exit(self):
         """
@@ -164,9 +171,11 @@ class PeerClient(Process):
         """
         if regex != False:
             files = glob.glob(f_path)
+            results = []
             for f in files:
                 term, ret = self._register(f)
-            return False, True
+                results.append(ret)
+            return False, Counter(results)
 
         if not os.path.isfile(f_path):
             self.logger.error("%s does not exist or is not a file." % f_path)
@@ -198,8 +207,7 @@ class PeerClient(Process):
                 except error:  # peer unreachable
                     continue
 
-        ret = True if replicate_to else False
-        return False, ret
+        return False, True
 
     def _local_ls(self, regex="./*"):
         """

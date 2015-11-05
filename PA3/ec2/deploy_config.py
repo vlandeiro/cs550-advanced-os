@@ -9,7 +9,7 @@ default_distributed = {
     'replica': 0,
     'max_connections': 20,
     'download_dir': './d/',
-    'timeout_value': 0.3,
+    'timeout_value': 0.1,
     'file_server_port': 4000,
     'idx_server_port': 5000
 }
@@ -22,14 +22,14 @@ default_centralized_peer = {
     'download_dir': './d/',
     'log_level': 'INFO',
     'max_connections': 20,
-    'timeout_value': 0.3
+    'timeout_value': 0.1
 }
 
 default_centralized_idx_server = {
     'log_level': 'INFO',
     'replica': 0,
     'max_connections': 20,
-    'timeout_value': 0.3,
+    'timeout_value': 0.1,
     'idx_server_port': 5000
 }
 
