@@ -47,8 +47,17 @@ class PeerClient(Process):
             'register': self._register,
             'list': self._ls,
             'help': self._display_help,
-            'ls': self._local_ls
+            'ls': self._local_ls,
+            'benchmark': self._benchmark
         }
+
+    def _benchmark1(self, cmd):
+        files = glob.glob('../benchmark_files/exp1/*')
+        print files[:10]
+
+    def _benchmark(self, exp, cmd):
+        bench_meth = getattr(self, "_benchmark%d" % exp)
+        bench_meth(cmd)
 
     def _exit(self):
         """
