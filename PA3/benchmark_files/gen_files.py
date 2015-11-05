@@ -10,7 +10,8 @@ ip = str(json.load(urlopen('https://api.ipify.org/?format=json'))['ip'])
 # generate files for first experiment
 def files_exp1(): # around 10 seconds
     print "Create files for first experiment."
-    os.makedirs("exp1")
+    if not os.path.exists("exp1"):
+        os.makedirs("exp1")
     t0 = time()
     block_1K = "0"*1024
     nb_files = 10**4
@@ -23,7 +24,8 @@ def files_exp1(): # around 10 seconds
 
 def files_exp2():
     print "Create files for second experiment."
-    os.makedirs("exp2")
+    if not os.path.exists("exp2"):
+        os.makedirs("exp2")
     block_sizes = [1024, 1024, 10*1024, 128*1024, 1024**2, 10*1024**2, 128*1024**2]
     blocks = ["0"*bs for bs in block_sizes]
     file_sizes = [1024, 10*1024, 100*1024, 1024**2, 10*1024**2, 100*1024**2, 1024**3]

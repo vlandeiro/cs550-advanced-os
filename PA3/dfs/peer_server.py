@@ -98,7 +98,7 @@ class PeerServer(Process):
         This function handles the connection from other peer to obtain files.
         :return: None
         """
-        self.logger.debug("Peer server listening on port %d", self.port)
+        self.logger.info("Starting the file server.")
 
         read_list = [self.listening_socket]
         try:

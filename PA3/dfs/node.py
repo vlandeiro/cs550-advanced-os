@@ -1,5 +1,6 @@
 from multiprocessing import Manager, Value
 
+import time
 import logging
 import json
 import sys
@@ -77,7 +78,7 @@ class Node:
                 self.dht.server.start()
 
             # Then, start the user interface
-            self.logger.debug("Starting the user interface.")
+            time.sleep(1)
             self.client.run()
             # Join the background processes
             self.file_server.join()

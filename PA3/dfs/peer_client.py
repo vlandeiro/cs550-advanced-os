@@ -58,7 +58,7 @@ class PeerClient(Process):
             'lookup': self._lookup
         }
         if cmd not in bench_map.keys():
-            raise AttributeError("%s not supported for benchmark." % cmd)
+            raise AttributeError("%s not supported for benchmark. Should be one of %s" % (cmd, bench_map.keys()))
         files = glob.glob('../benchmark_files/exp1/*')
         t0 = time.time()
         for f in files:
@@ -66,8 +66,18 @@ class PeerClient(Process):
         delta = time.time() - t0
         self.logger.info('Benchmark %s took %.3f seconds.', cmd, delta)
 
-    def _benchmark2(self, cmd):
-        pass
+    def _benchmark2(self, file_size):
+        bench_map = ['1K', '10K', '100K', '1M', '10M', '100M', '1G']
+        if file_size not in bench_map:
+            raise AttributeError("%s is a size not supported in this benchmark: should be one of %s" % (file_size, bench_map))
+        idx = bench_map.index(file_size)
+
+        files = glob.glob('../benchmark_files/exp2/f%d*' % idx)
+        t0 = time.time()
+        for f in files:
+            self._lookup(f)
+        delta = time.time() - t0
+        self.logger.info('Benchmark to obtain files of size %s took %.3f seconds.', file_size, delta)
 
     def _benchmark(self, exp, cmd):
         try:
@@ -141,14 +151,21 @@ class PeerClient(Process):
                     print "\t- %s" % p
         return False, available_peers
 
-    def _register(self, f_path):
+    def _register(self, f_path, regex=False):
         """
         Register a given file to the indexing server.
         :param f_path: path to the file to register.
+        :param regex: if not False, then f_path is processed as a regular expression.
         :return: False, True if replication has been done or False otherwise.
         """
+        if regex != False:
+            files = glob.glob(f_path)
+            for f in files:
+                term, ret = self._register(f)
+            return False, True
+
         if not os.path.isfile(f_path):
-            print("Error: %s does not exist or is not a file." % f_path)
+            self.logger.error("%s does not exist or is not a file." % f_path)
             return False, False
 
         # Register to the indexing server
@@ -280,6 +297,7 @@ class PeerClient(Process):
         Handle the user input and the connections to the indexing server and the other peers.
         :return: None
         """
+        self.logger.info("Start the user interface.")
 
         # Start by connecting to the Indexing Server
         self._idx_server_connect()
