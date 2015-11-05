@@ -52,12 +52,32 @@ class PeerClient(Process):
         }
 
     def _benchmark1(self, cmd):
+        bench_map = {
+            'register': self._register,
+            'search': lambda x: self._search(x, pprint=False),
+            'lookup': self._lookup
+        }
+        if cmd not in bench_map.keys():
+            raise AttributeError("%s not supported for benchmark." % cmd)
         files = glob.glob('../benchmark_files/exp1/*')
-        print files[:10]
+        t0 = time.time()
+        for f in files:
+            bench_map[cmd](f)
+        delta = time.time() - t0
+        self.logger.info('Benchmark %s took %.3f seconds.', cmd, delta)
+
+    def _benchmark2(self, cmd):
+        pass
 
     def _benchmark(self, exp, cmd):
-        bench_meth = getattr(self, "_benchmark%d" % exp)
-        bench_meth(cmd)
+        try:
+            exp_num = int(exp)
+            bench_meth = getattr(self, "_benchmark%d" % exp_num)
+            bench_meth(cmd)
+        except (AttributeError, ValueError) as e:
+            self.logger.error(e)
+            return False, False
+        return False, True
 
     def _exit(self):
         """
@@ -74,7 +94,7 @@ class PeerClient(Process):
         :param name: name of the file to obtain.
         :return: False, False
         """
-        _, available_peers = self._search(name)
+        _, available_peers = self._search(name, pprint=False)
         file_obtained = False
         while not file_obtained and available_peers:
             peer = available_peers.pop(0)
