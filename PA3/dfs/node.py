@@ -34,6 +34,7 @@ class Node:
         self.log_level = config['log_level']
         self.timeout_value = config['timeout_value']
         self.max_connections = config['max_connections']
+        self.ip = str(json.load(urlopen('https://api.ipify.org/?format=json'))['ip'])
 
         # set up logger
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -46,7 +47,6 @@ class Node:
             self.nodes_count = len(self.nodes_list)
             self.replica = config['replica']
             # get this server info from config file
-            self.ip = str(json.load(urlopen('https://api.ipify.org/?format=json'))['ip'])
             if self.ip not in self.nodes_list:
                 raise ValueError("peer %s is not included in the config file." % self.ip)
             self.id = self.nodes_list.index(self.ip)
