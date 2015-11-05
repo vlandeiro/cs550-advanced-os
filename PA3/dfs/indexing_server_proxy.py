@@ -142,7 +142,8 @@ class DistributedISProxy(ISProxy):
             return False
         if previous_value is None:
             previous_value = []
-        previous_value.append(id)
+        if id not in previous_value:
+            previous_value.append(id)
         self._put(name, previous_value, replicate=replicate)
 
     def register(self, id, name):

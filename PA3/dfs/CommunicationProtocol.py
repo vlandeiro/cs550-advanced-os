@@ -5,6 +5,8 @@ import pickle
 import sys
 import os
 import logging
+import errno
+import time
 
 BUFFER_SIZE = 4096
 
@@ -23,15 +25,23 @@ class MessageExchanger:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLevelName(log))
 
-    def send(self, msg):
+    def send(self, msg, trials=5):
         """
         Send a message by sending its length first and then the content.
         :param msg: message to send as a string.
         :return: None
         """
         # send length of the message
-        msg = struct.pack('>I', len(msg)) + msg
-        self.sock.sendall(msg)
+        try:
+            msg = struct.pack('>I', len(msg)) + msg
+            self.sock.sendall(msg)
+        except error as e:
+            if e.errno == errno.EAGAIN:
+                if trials == 0:
+                    raise
+                else:
+                    time.sleep(.1)
+                    self.send(msg, trials=trials-1)
 
     def recv(self):
         """
