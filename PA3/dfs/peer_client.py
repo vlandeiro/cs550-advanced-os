@@ -75,7 +75,7 @@ class PeerClient(Process):
             _, ret = bench_map[cmd](f)
             results.append(True if ret else False)
         delta = time.time() - t0
-        self.logger.info('Benchmark %s took %.3f seconds.', cmd, delta)
+        self.logger.info('Benchmark %s on %d files took %.3f seconds.', cmd, len(files), delta)
         return Counter(results)
 
     def _benchmark2(self, file_size):
