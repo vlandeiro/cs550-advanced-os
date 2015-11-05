@@ -5,6 +5,7 @@ import time
 import os
 import sys
 import errno
+import re
 
 from multiprocessing import Process
 from socket import *
@@ -72,8 +73,10 @@ class PeerClient(Process):
         if file_size not in bench_map:
             raise AttributeError("%s is a size not supported in this benchmark: should be one of %s" % (file_size, bench_map))
         idx = bench_map.index(file_size)
-
-        files = glob.glob('../benchmark_files/exp2/f%d*' % idx)
+        
+        _, all_files = self._ls(pprint=False)
+        files = [f for f in all_files if re.match('f%d*' % idx, f)]
+        self.logger.info('%d files to lookup.' % len(files))
         t0 = time.time()
         for f in files:
             self._lookup(f)

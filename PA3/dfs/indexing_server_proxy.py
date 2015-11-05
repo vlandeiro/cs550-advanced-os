@@ -189,7 +189,7 @@ class DistributedISProxy(ISProxy):
 
     def _put(self, key, value, replicate=True):
         sid = self.parent.server_hash(key)
-        if replicate:
+        if replicate and self.parent.replica > 0:
             sid_replica = (sid + 1) % self.parent.nodes_count
             self._generic_action_sid(sid_replica, "put", [key, value])
         return self._generic_action_sid(sid, "put", [key, value])
