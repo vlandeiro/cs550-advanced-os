@@ -6,6 +6,7 @@ import os
 import sys
 import errno
 import re
+import numpy as np
 
 from collections import Counter
 from multiprocessing import Process
@@ -62,12 +63,17 @@ class PeerClient(Process):
         }
         if cmd not in bench_map.keys():
             raise AttributeError("%s not supported for benchmark. Should be one of %s" % (cmd, bench_map.keys()))
-        files = glob.glob('../benchmark_files/exp1/*')
+        _, all_files = self._ls(pprint=False)
+        if cmd in ['search', 'lookup']:
+            files = [f for f in all_files if not re.match('f.*%s' % self.ip, f)]
+            files = np.random.choice(files, 100, replace=False)
+        else:
+            files = glob.glob('../benchmark_files/exp1/*')
         results = []
         t0 = time.time()
         for f in files:
             _, ret = bench_map[cmd](f)
-            results.append(ret)
+            results.append(True if ret else False)
         delta = time.time() - t0
         self.logger.info('Benchmark %s took %.3f seconds.', cmd, delta)
         return Counter(results)
@@ -79,7 +85,9 @@ class PeerClient(Process):
         idx = bench_map.index(file_size)
         
         _, all_files = self._ls(pprint=False)
-        files = [f for f in all_files if re.match('f%d*' % idx, f)]
+        files = [f for f in all_files if re.match('f%d.*' % idx, f)]
+        local_files = [os.path.basename(f) for f in glob.glob('../benchmark_files/exp2/*')]
+        files = [f for f in files if f not in local_files]
         self.logger.info('%d files to lookup.' % len(files))
         results = []
         t0 = time.time()
@@ -87,7 +95,7 @@ class PeerClient(Process):
             _, ret = self._lookup(f)
             results.append(ret)
         delta = time.time() - t0
-        self.logger.info('Benchmark to obtain files of size %s took %.3f seconds.', file_size, delta)
+        self.logger.info('Benchmark to obtain %d files of size %s took %.3f seconds.', len(files), file_size, delta)
         return Counter(results)
 
     def _benchmark(self, exp, cmd):
