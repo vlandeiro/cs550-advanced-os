@@ -122,36 +122,36 @@ class PeerClient(Process):
         return True, None
 
     def _get_peer_sock(self, peer_id):
-        peerip = peer_id.split(':')[0]
+        addr, port = peer_id.split(':')
         peers_sock = self.parent.peers_sock
         peers_check = self.parent.peers_check
-        self.logger.debug(peerip)
+        self.logger.debug(addr)
         self.logger.debug(peers_sock.keys())
-        if peerip not in peers_sock or peers_sock[peerip] is None:
+        ret = False
+        if addr not in peers_sock.keys() or peers_sock[addr] is None:
             # connection to peer
             try:
-                addr, port = peer_id.split(':')
                 port = int(port)
                 conn_param = (addr, port)
                 self.logger.debug('Connect to: %s', repr(conn_param))
                 peer_sock = socket(AF_INET, SOCK_STREAM)
-                peers_sock[peerip] = peer_sock
-                peers_check[peerip] = time.time()
+                peers_sock[addr] = peer_sock
+                peers_check[addr] = time.time()
                 peer_sock.connect(conn_param)
-                ret = peers_sock[peerip]
+                ret = peers_sock[addr]
             except error as e: # peer unreachable
                 if e.errno == errno.ECONNREFUSED:
-                    peers_sock[peerip] = False
-                    peers_check[peerip] = time.time()
+                    peers_sock[addr] = False
+                    peers_check[addr] = time.time()
                     ret = False
-        elif peers_sock[peerip] is False:
+        elif peers_sock[addr] is False:
             # check if last status change was more than n seconds ago
             # try to reconnect if timeout has expired
-            if time.time()-peers_check[peerip] > self.parent.check_timeout:
-                peers_sock[peerip] = None
-                ret = self._get_peer_sock(peerip)
+            if time.time()-peers_check[addr] > self.parent.check_timeout:
+                peers_sock[addr] = None
+                ret = self._get_peer_sock(addr)
         else:
-            ret = peers_sock[peerip]
+            ret = peers_sock[addr]
         self.parent.peers_sock = peers_sock
         self.parent.peers_check = peers_check
         return ret
@@ -303,7 +303,9 @@ class PeerClient(Process):
         :return: None
         """
         self.idx_server_proxy.close_connection(self.id)
-        for peer_id, sock in self.peers_sock.iteritems():
+        peers_sock = self.parent.peers_sock
+        for peer_id in peers_sock.keys():
+            sock = peers_sock[peer_id]
             if sock:
                 exch = MessageExchanger(sock)
                 peer_action = dict(type='exit')
