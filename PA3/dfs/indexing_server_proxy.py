@@ -102,10 +102,7 @@ class DistributedISProxy(ISProxy):
 
     def get_peer_sock(self, server_id):
         self.logger.debug("Server id requested: %s", repr(server_id))
-        addr = self.parent.nodes_list[server_id]
-        nodes_status = self.parent.parent.nodes_status
-        cond = addr not in nodes_status or nodes_status[addr]
-        if self.socket_map[server_id] is None and cond:
+        if self.socket_map[server_id] is None:
             sock = socket(AF_INET, SOCK_STREAM)
             peer_ip = self.parent.nodes_list[server_id]
             try:

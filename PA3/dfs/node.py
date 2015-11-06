@@ -44,7 +44,6 @@ class Node:
         # create shared dictionary to store the local paths to the registered files
         self.manager = Manager()
         self.local_files = self.manager.dict()
-        self.nodes_status = self.manager.dict()
 
         # configuration when the indexing server is distributed
         if self.idx_type == 'distributed':

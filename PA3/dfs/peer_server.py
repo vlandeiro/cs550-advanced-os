@@ -38,9 +38,7 @@ class PeerServer(Process):
 
 
     def _close_socket(self, exch, id):
-        nodes_status = self.parent.nodes_status
-        nodes_status[id] = False
-        self.parent.nodes_status = nodes_status
+        return False
 
     def _obtain(self, name, exch):
         """
@@ -99,6 +97,7 @@ class PeerServer(Process):
             self.logger.debug(repr(action))
             action['exch'] = peer_exch
             open_conn = self._generic_action(action)
+        peer_sock.shutdown(1)
         peer_sock.close()
         self.parent.client.peers_sock[peer_addr] = None
         self.parent.client.peers_check[peer_addr] = time.time()
@@ -125,4 +124,5 @@ class PeerServer(Process):
         except KeyboardInterrupt:
             pass
         finally:
+            self.listening_socket.shutdown(1)
             self.listening_socket.close()

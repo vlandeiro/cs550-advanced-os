@@ -308,6 +308,7 @@ class PeerClient(Process):
                 exch = MessageExchanger(sock)
                 peer_action = dict(type='exit', id=peer_id)
                 exch.pkl_send(peer_action)
+                sock.shutdown(1)
                 sock.close()
 
     def do(self, action, args):
