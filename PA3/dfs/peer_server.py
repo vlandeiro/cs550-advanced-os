@@ -38,9 +38,6 @@ class PeerServer(Process):
 
 
     def _close_socket(self, exch, id):
-        sock_status = self.parent.sock_status
-        sock_status[id] = False
-        self.sock_status = sock_status
         return False
 
     def _obtain(self, name, exch):
