@@ -120,8 +120,10 @@ class DistributedISProxy(ISProxy):
     def close_connection(self, id):
         ip = id.split(':')[0]
         nid = self.parent.nodes_list.index(ip)
-        self.socket_map[nid].close()
-        self.socket_map[nid] = None
+        self.logger.debug('%d %s', nid, self.socket_map[nid])
+        if self.socket_map[nid] is not None:
+            self.socket_map[nid].close()
+            self.socket_map[nid] = None
 
     def list(self):
         ls = set(self.parent.keys())
