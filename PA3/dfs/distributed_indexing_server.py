@@ -42,8 +42,6 @@ class DHT():
         self.hashmap = self.manager.dict()
         self.map_lock = self.manager.Lock()
 
-        self.terminate = terminate
-
         self.server = DHTServer(self)
 
     def put(self, key, value):

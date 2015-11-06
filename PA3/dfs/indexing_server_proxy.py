@@ -102,7 +102,9 @@ class DistributedISProxy(ISProxy):
 
     def get_peer_sock(self, server_id):
         self.logger.debug("Server id requested: %s", repr(server_id))
-        if self.socket_map[server_id] is None:
+        addr = self.parent.nodes_list[server_id]
+        cond = addr not in self.parent.nodes_status or self.parent.nodes_status[addr]
+        if self.socket_map[server_id] is None and cond:
             sock = socket(AF_INET, SOCK_STREAM)
             peer_ip = self.parent.nodes_list[server_id]
             try:
@@ -118,12 +120,11 @@ class DistributedISProxy(ISProxy):
         pass
 
     def close_connection(self, id):
-        ip = id.split(':')[0]
-        nid = self.parent.nodes_list.index(ip)
-        self.logger.debug('%d %s', nid, self.socket_map[nid])
-        if self.socket_map[nid] is not None:
-            self.socket_map[nid].close()
-            self.socket_map[nid] = None
+        for ip, sock in self.socket_map:
+            if sock:
+                sock.shutdown(1)
+                sock.close()
+            self.socket_map[ip] = None
 
     def list(self):
         ls = set(self.parent.keys())
