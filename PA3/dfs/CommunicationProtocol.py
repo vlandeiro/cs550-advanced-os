@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 class MessageExchanger:
-    def __init__(self, sock, log='DEBUG'):
+    def __init__(self, sock, log='INFO'):
         """
         Initialize a MessageExchanger object.
         :param sock: socket through which communication is done.
