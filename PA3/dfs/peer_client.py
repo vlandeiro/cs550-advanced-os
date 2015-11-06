@@ -124,7 +124,7 @@ class PeerClient(Process):
         return True, None
 
     def _get_peer_sock(self, peer_id):
-        peer_ip = peer_id.split(':')[0]
+        peerip = peer_id.split(':')[0]
         self.logger.debug(peerip)
         if peerip not in self.peers_sock:
             # wrong peer id
