@@ -140,7 +140,7 @@ class DistributedISProxy(ISProxy):
         self.logger.debug(repr(previous_value))
         if previous_value is False:  # nodes are offline
             return False
-        if previous_value is None:
+        elif previous_value is None:
             previous_value = []
         if id not in previous_value:
             previous_value.append(id)

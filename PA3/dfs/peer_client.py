@@ -92,7 +92,9 @@ class PeerClient(Process):
         _, all_files = self._ls(pprint=False)
         files = [f for f in all_files if re.match('f%d.*' % idx, f)]
         local_files = [os.path.basename(f) for f in glob.glob('../benchmark_files/exp2/*')]
+        self.logger.info('all_files = %d, files = %d, local_files = %d', len(all_files), len(files), len(local_files))
         files = [f for f in files if f not in local_files]
+        self.logger.info('final_files = %d', len(files))
         self.logger.info('%d files to lookup.' % len(files))
         results = []
         t0 = time.time()
@@ -122,33 +124,34 @@ class PeerClient(Process):
         return True, None
 
     def _get_peer_sock(self, peer_id):
-        self.logger.debug(peer_id)
-        if peer_id not in self.peers_sock:
+        peer_ip = peer_id.split(':')[0]
+        self.logger.debug(peerip)
+        if peerip not in self.peers_sock:
             # wrong peer id
             return False
-        elif self.peers_sock[peer_id] is None:
+        elif self.peers_sock[peerip] is None:
             # connection to peer
             try:
-                addr, port = peer_id.split(':')
+                addr, port = peerip.split(':')
                 port = int(port)
                 conn_param = (addr, port)
                 peer_sock = socket(AF_INET, SOCK_STREAM)
                 peer_sock.setblocking(0)
-                self.peers_sock[peer_id] = peer_sock
-                self.peers_check[peer_id] = time.time()
+                self.peers_sock[peerip] = peer_sock
+                self.peers_check[peerip] = time.time()
                 peer_sock.connect(conn_param)
-                return self.peers_check[peer_id]
+                return self.peers_check[peerip]
             except error as e: # peer unreachable
                 if e.errno == errno.ECONNREFUSED:
-                    self.peers_sock[peer_id] = False
-                    self.peers_check[peer_id] = time.time()
+                    self.peers_sock[peerip] = False
+                    self.peers_check[peerip] = time.time()
                     return False
-        elif self.peers_sock[peer_id] is False:
+        elif self.peers_sock[peerip] is False:
             # check if last status change was more than n seconds ago
             # try to reconnect if timeout has expired
-            if time.time()-self.peers_check[peer_id] > self.check_timeout:
-                self.peers_sock[peer_id] = None
-                return self._get_peer_sock(peer_id)
+            if time.time()-self.peers_check[peerip] > self.check_timeout:
+                self.peers_sock[peerip] = None
+                return self._get_peer_sock(peerip)
 
     def _lookup(self, name):
         """
@@ -229,8 +232,8 @@ class PeerClient(Process):
         self.parent.local_files = local_files
 
         # Replicate files
-        self.logger.debug("Replicate to %s", replicate_to)
         if replicate_to:
+            self.logger.debug("Replicate to %s", replicate_to)
             for peer_id in replicate_to:
                 peer_sock = self._get_peer_sock(peer_id)
                 if peer_sock:
