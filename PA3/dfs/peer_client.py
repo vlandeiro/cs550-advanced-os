@@ -311,6 +311,7 @@ class PeerClient(Process):
                 exch = MessageExchanger(sock)
                 peer_action = dict(type='exit')
                 exch.pkl_send(peer_action)
+            sock.close()
 
     def do(self, action, args):
         """
@@ -344,8 +345,7 @@ class PeerClient(Process):
             self._init_connection()
         except error as e:
             if e.errno == errno.ECONNREFUSED:
-                self.logger.error(
-                    "Connection refused by the Indexing Server. Are you sure the Indexing Server is running?")
+                self.logger.error("Connection refused by the Indexing Server. Are you sure the Indexing Server is running?")
                 sys.exit(1)
 
     def run(self):

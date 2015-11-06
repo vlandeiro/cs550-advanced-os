@@ -25,7 +25,8 @@ class PeerServer(Process):
         self.logger.setLevel(level)
         self.actions = {
             'obtain': self._obtain,
-            'replicate': self._recv_replica
+            'replicate': self._recv_replica,
+            'exit': self._close_socket
         }
         self.ip = parent.ip
         self.port = parent.file_server_port
