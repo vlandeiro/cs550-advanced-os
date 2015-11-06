@@ -25,15 +25,22 @@ class MessageExchanger:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLevelName(log))
 
-    def send(self, msg, trials=5):
+    def send(self, msg):
         """
         Send a message by sending its length first and then the content.
         :param msg: message to send as a string.
         :return: None
         """
         # send length of the message
-        msg = struct.pack('>I', len(msg)) + msg
-        self.sock.sendall(msg)
+        msg = struct.pack('>L', len(msg)) + msg
+        bytes_sent = 0
+        while bytes_sent < len(msg):
+            try:
+                bytes_sent += self.sock.send(msg)
+            except error as e:
+                if e.errno == errno.EAGAIN:
+                    time.sleep(0.05)
+                    continue
 
     def recv(self):
         """
@@ -44,7 +51,7 @@ class MessageExchanger:
         raw_msglen = self.recvall(4)
         if not raw_msglen:
             return None
-        msglen = struct.unpack('>I', raw_msglen)[0]
+        msglen = struct.unpack('>L', raw_msglen)[0]
         # get message
         return self.recvall(msglen)
 
