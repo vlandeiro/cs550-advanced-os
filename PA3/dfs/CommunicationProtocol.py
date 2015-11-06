@@ -33,10 +33,14 @@ class MessageExchanger:
         """
         # send length of the message
         msg = struct.pack('>L', len(msg)) + msg
+        l = len(msg)
         bytes_sent = 0
-        while bytes_sent < len(msg):
+        while bytes_sent < l:
             try:
-                bytes_sent += self.sock.send(msg)
+                lb = bytes_sent
+                ub = max(lb+BUFFER_SIZE, l)
+                bs = self.sock.send(msg[lb:ub])
+                bytes_sent += bs
             except error as e:
                 if e.errno == errno.EAGAIN:
                     time.sleep(0.05)
