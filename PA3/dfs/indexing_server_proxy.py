@@ -121,11 +121,11 @@ class DistributedISProxy(ISProxy):
         pass
 
     def close_connection(self, id):
-        for ip, sock in self.socket_map:
+        for j, sock in enumerate(self.socket_map):
             if sock:
                 sock.shutdown(1)
                 sock.close()
-            self.socket_map[ip] = None
+            self.socket_map[j] = None
 
     def list(self):
         ls = set(self.parent.keys())
