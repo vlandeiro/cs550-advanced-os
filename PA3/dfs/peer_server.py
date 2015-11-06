@@ -88,11 +88,11 @@ class PeerServer(Process):
         """
         self.logger.debug("Accepted connection from %s", peer_addr)
         peer_exch = MessageExchanger(peer_sock)
-
         open_conn = True
         while open_conn != False:
             self.logger.debug("%s: %s", repr(peer_sock), open_conn)
             action = peer_exch.pkl_recv()
+            self.logger.debug(repr(action))
             action['exch'] = peer_exch
             open_conn = self._generic_action(action)
         peer_sock.close()

@@ -115,32 +115,36 @@ class PeerClient(Process):
             return False, False
         return False, results
 
+
     def _exit(self):
         """
         Set the terminate shared variable to 1 to exit all the running processes.
         :return: True, None
         """
         self.parent.terminate.value = 1
+        self.close_connection()
         return True, None
 
     def _get_peer_sock(self, peer_id):
         peerip = peer_id.split(':')[0]
         self.logger.debug(peerip)
-        if peerip not in self.peers_sock:
+        self.logger.debug(self.peers_sock.keys())
+        if peerip not in self.peers_sock.keys():
             # wrong peer id
             return False
-        elif self.peers_sock[peerip] is None:
+        self.logger.debug(self.peers_sock[peerip])
+        if self.peers_sock[peerip] is None:
             # connection to peer
             try:
                 addr, port = peer_id.split(':')
                 port = int(port)
                 conn_param = (addr, port)
+                self.logger.debug('Connect to: %s', repr(conn_param))
                 peer_sock = socket(AF_INET, SOCK_STREAM)
-                peer_sock.setblocking(0)
                 self.peers_sock[peerip] = peer_sock
                 self.peers_check[peerip] = time.time()
                 peer_sock.connect(conn_param)
-                return self.peers_check[peerip]
+                return self.peers_sock[peerip]
             except error as e: # peer unreachable
                 if e.errno == errno.ECONNREFUSED:
                     self.peers_sock[peerip] = False
@@ -166,6 +170,7 @@ class PeerClient(Process):
             peer_id = available_peers.pop(0)
             # Establish connection to the peer to obtain file
             peer_sock = self._get_peer_sock(peer_id)
+            self.logger.debug('peer_sock in lookup: %s', repr(peer_sock))
             if peer_sock:
                 peer_exch = MessageExchanger(peer_sock)
                 peer_action = dict(type='obtain', name=name)
@@ -302,7 +307,7 @@ class PeerClient(Process):
         for peer_id, sock in self.peers_sock.iteritems():
             if sock:
                 exch = MessageExchanger(sock)
-                peer_action = dict(action='exit')
+                peer_action = dict(type='exit')
                 exch.pkl_send(peer_action)
 
     def do(self, action, args):
@@ -371,7 +376,5 @@ class PeerClient(Process):
             except KeyboardInterrupt as e:
                 sys.stderr.write("\r\n")
             except EOFError:
-                self.parent.terminate.value = 1
-                self.close_connection()
-                self.idx_server_proxy.close_connection(self.id)
+                self._exit()
                 break
