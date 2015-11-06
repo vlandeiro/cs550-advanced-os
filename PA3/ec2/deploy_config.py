@@ -62,10 +62,12 @@ def deploy_centralized_config(access_id, secret_key, ssh_key_file):
     conn, instances = get_running_instances(access_id, secret_key)
 
     # define first instance as the indexing server and copy configuration
+    nodes_config = {'nodes':[]}
     print("Configure central indexing server.")
     with open('config_server.json', 'w') as fd:
         fd.write(json.dumps(config_idx_server))
     idx_server = instances[0]
+    nodes_config['nodes'].append(idx_server.ip_address)
     idx_server.add_tag("Name", "CIS")
     cmd = "scp -q -i %s config_server.json ubuntu@%s:/home/ubuntu/cs550-advanced-os/PA3/dfs/config.json" % (ssh_key_file, idx_server.ip_address)
     call(cmd.split())
@@ -78,11 +80,14 @@ def deploy_centralized_config(access_id, secret_key, ssh_key_file):
         fd.write(json.dumps(config_peer))
     node_id = 0
     for inst in instances[1:]:
+        nodes_config['nodes'].append(inst.ip_address)
         inst.add_tag("Name", "Node_%d" % node_id)
         node_id += 1
         print("Copy configuration file to %s." % inst.ip_address)
         cmd = "scp -q -i %s config_peer.json ubuntu@%s:/home/ubuntu/cs550-advanced-os/PA3/dfs/config.json" % (ssh_key_file, inst.ip_address)
         call(cmd.split())
+    with open('config.json', 'w') as fd:
+        fd.write(json.dumps(nodes_config))
     conn.close()
 
 def deploy_distributed_config(access_id, secret_key, ssh_key_file):
