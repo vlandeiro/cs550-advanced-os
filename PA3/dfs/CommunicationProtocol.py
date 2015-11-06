@@ -32,16 +32,8 @@ class MessageExchanger:
         :return: None
         """
         # send length of the message
-        try:
-            msg = struct.pack('>I', len(msg)) + msg
-            self.sock.sendall(msg)
-        except error as e:
-            if e.errno == errno.EAGAIN:
-                if trials == 0:
-                    raise
-                else:
-                    time.sleep(.1)
-                    self.send(msg, trials=trials-1)
+        msg = struct.pack('>I', len(msg)) + msg
+        self.sock.sendall(msg)
 
     def recv(self):
         """
