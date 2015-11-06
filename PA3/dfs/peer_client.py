@@ -156,6 +156,8 @@ class PeerClient(Process):
             if time.time()-self.peers_check[peerip] > self.check_timeout:
                 self.peers_sock[peerip] = None
                 return self._get_peer_sock(peerip)
+        else:
+            return self.peers_sock[peerip]
 
     def _lookup(self, name):
         """
