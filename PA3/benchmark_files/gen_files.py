@@ -30,7 +30,7 @@ def files_exp2():
     blocks = ["0"*bs for bs in block_sizes]
     file_sizes = [1024, 10*1024, 100*1024, 1024**2, 10*1024**2, 100*1024**2, 1024**3]
     blocks_count = [x/y for x,y in zip(file_sizes, block_sizes)]
-    file_count = [10**4, 10**3, 10**2, 10, 4, 2, 1]
+    file_count = [10**4, 10**3, 10**2, 64, 32, 8, 1]
 
     for k, (b, bc, fc, fs) in enumerate(zip(blocks, blocks_count, file_count, file_sizes)):
         print "- Creating %d files of size %d." % (fc, fs)
