@@ -3,6 +3,7 @@ import os
 
 from multiprocessing import Process
 from socket import *
+import time
 from CommunicationProtocol import MessageExchanger
 from select import select
 
@@ -97,6 +98,8 @@ class PeerServer(Process):
             action['exch'] = peer_exch
             open_conn = self._generic_action(action)
         peer_sock.close()
+        self.parent.client.peers_sock[peer_addr] = None
+        self.parent.client.peers_check[peer_addr] = time.time()
 
     def run(self):
         """
