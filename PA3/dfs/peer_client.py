@@ -306,7 +306,6 @@ class PeerClient(Process):
         :return: None
         """
         self.idx_server_proxy.close_connection(self.id)
-        peers_sock = self.parent.peers_sock
         for peer_id, sock in self.peers_sock.iteritems():
             if sock:
                 exch = MessageExchanger(sock)
@@ -314,7 +313,7 @@ class PeerClient(Process):
                 exch.pkl_send(peer_action)
                 sock.close()
                 sock_status = self.parent.sock_status
-                sock_status[peers_sock] = False
+                sock_status[peer_id] = False
                 self.parent.sock_status = sock_status
 
     def do(self, action, args):
