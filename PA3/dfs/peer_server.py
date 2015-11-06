@@ -34,6 +34,10 @@ class PeerServer(Process):
         self.listening_socket.bind(("0.0.0.0", self.port))
         self.listening_socket.listen(parent.max_connections)
 
+
+    def _close_socket(self, exch):
+        return False
+
     def _obtain(self, name, exch):
         """
         Action executed when a peer ask for a file. Acknowledge the request and then send the file.
@@ -45,10 +49,10 @@ class PeerServer(Process):
             fpath = self.parent.local_files[name]
             exch.pkl_send(True)
             exch.file_send(fpath)
-            return False
+            return True
         except KeyError as e:
             exch.pkl_send(False)
-            return False
+            return True
 
     def _recv_replica(self, exch, name):
         """
@@ -62,7 +66,7 @@ class PeerServer(Process):
         local_files[name] = os.path.abspath(fpath)
         self.parent.local_files = local_files
         exch.file_recv(fpath, show_progress=False)
-        return False
+        return True
 
     def _generic_action(self, action):
         """

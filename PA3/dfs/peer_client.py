@@ -44,6 +44,11 @@ class PeerClient(Process):
         self.logger.setLevel(level)
         self.idx_server_sock = None
         self.idx_server_proxy = None
+
+        self.peers_sock = {k: None for k in parent.nodes_list}
+        self.peers_check = {k: 0 for k in parent.nodes_list}
+        self.check_timeout = 5
+
         self.actions = {
             'exit': self._exit,
             'lookup': self._lookup,
@@ -116,6 +121,35 @@ class PeerClient(Process):
         self.parent.terminate.value = 1
         return True, None
 
+    def _get_peer_sock(self, peer_id):
+        self.logger.debug(peer_id)
+        if peer_id not in self.peers_sock:
+            # wrong peer id
+            return False
+        elif self.peers_sock[peer_id] is None:
+            # connection to peer
+            try:
+                addr, port = peer_id.split(':')
+                port = int(port)
+                conn_param = (addr, port)
+                peer_sock = socket(AF_INET, SOCK_STREAM)
+                peer_sock.setblocking(0)
+                self.peers_sock[peer_id] = peer_sock
+                self.peers_check[peer_id] = time.time()
+                peer_sock.connect(conn_param)
+                return self.peers_check[peer_id]
+            except error as e: # peer unreachable
+                if e.errno == errno.ECONNREFUSED:
+                    self.peers_sock[peer_id] = False
+                    self.peers_check[peer_id] = time.time()
+                    return False
+        elif self.peers_sock[peer_id] is False:
+            # check if last status change was more than n seconds ago
+            # try to reconnect if timeout has expired
+            if time.time()-self.peers_check[peer_id] > self.check_timeout:
+                self.peers_sock[peer_id] = None
+                return self._get_peer_sock(peer_id)
+
     def _lookup(self, name):
         """
         Search for peers where a given file is stored and then request these peers for the file until the file
@@ -126,30 +160,20 @@ class PeerClient(Process):
         _, available_peers = self._search(name, pprint=False)
         file_obtained = False
         while not file_obtained and available_peers:
-            peer = available_peers.pop(0)
-            self.logger.debug(peer)
+            peer_id = available_peers.pop(0)
             # Establish connection to the peer to obtain file
-            addr, port = peer.split(':')
-            port = int(port)
-            conn_param = (addr, port)
-            peer_sock = socket(AF_INET, SOCK_STREAM)
-            try:
-                peer_sock.connect(conn_param)
+            peer_sock = self._get_peer_sock(peer_id)
+            if peer_sock:
                 peer_exch = MessageExchanger(peer_sock)
                 peer_action = dict(type='obtain', name=name)
                 peer_exch.pkl_send(peer_action)
-                filepath = os.path.join(self.download_dir, name)
+                f_path = os.path.join(self.download_dir, name)
                 file_exists = peer_exch.pkl_recv()
                 if file_exists:
-                    peer_exch.file_recv(filepath, show_progress=False)
+                    peer_exch.file_recv(f_path, show_progress=False)
                     return False, True
                 else:
                     return False, False
-            except error:
-                # peer not reachable
-                continue
-            finally:
-                peer_sock.close()
         return False, False
 
     def _search(self, name, pprint=True):
@@ -207,19 +231,13 @@ class PeerClient(Process):
         # Replicate files
         self.logger.debug("Replicate to %s", replicate_to)
         if replicate_to:
-            for peer in replicate_to:
-                addr, port = peer.split(':')
-                port = int(port)
-                conn_param = (addr, port)
-                peer_sock = socket(AF_INET, SOCK_STREAM)
-                try:
-                    peer_sock.connect(conn_param)
+            for peer_id in replicate_to:
+                peer_sock = self._get_peer_sock(peer_id)
+                if peer_sock:
                     peer_exch = MessageExchanger(peer_sock)
                     peer_action = dict(type='replicate', name=name)
                     peer_exch.pkl_send(peer_action)
                     peer_exch.file_send(f_path)
-                except error:  # peer unreachable
-                    continue
 
         return False, True
 
@@ -276,10 +294,15 @@ class PeerClient(Process):
 
     def close_connection(self):
         """
-        Close the connection with the indexing server.
+        Close the connection with the indexing server and the peers.
         :return: None
         """
         self.idx_server_proxy.close_connection(self.id)
+        for peer_id, sock in self.peers_sock.iteritems():
+            if sock:
+                exch = MessageExchanger(sock)
+                peer_action = dict(action='exit')
+                exch.pkl_send(peer_action)
 
     def do(self, action, args):
         """
