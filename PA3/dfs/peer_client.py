@@ -132,7 +132,7 @@ class PeerClient(Process):
         elif self.peers_sock[peerip] is None:
             # connection to peer
             try:
-                addr, port = peerip.split(':')
+                addr, port = peer_id.split(':')
                 port = int(port)
                 conn_param = (addr, port)
                 peer_sock = socket(AF_INET, SOCK_STREAM)
@@ -158,7 +158,7 @@ class PeerClient(Process):
         Search for peers where a given file is stored and then request these peers for the file until the file
         is entirely stored locally.
         :param name: name of the file to obtain.
-        :return: False, False
+        :return: False, True if the file has been downloaded or False if not.
         """
         _, available_peers = self._search(name, pprint=False)
         file_obtained = False
@@ -174,10 +174,8 @@ class PeerClient(Process):
                 file_exists = peer_exch.pkl_recv()
                 if file_exists:
                     peer_exch.file_recv(f_path, show_progress=False)
-                    return False, True
-                else:
-                    return False, False
-        return False, False
+                    file_obtained = True
+        return False, file_obtained
 
     def _search(self, name, pprint=True):
         """
