@@ -1,4 +1,3 @@
-#!/usr/bin/python
 import json
 from subprocess import call
 
