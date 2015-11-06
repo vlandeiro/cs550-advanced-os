@@ -118,7 +118,10 @@ class DistributedISProxy(ISProxy):
         pass
 
     def close_connection(self, id):
-        pass
+        ip = id.split(':')[0]
+        nid = self.parent.nodes_list.index(ip)
+        self.socket_map[nid].close()
+        self.socket_map[nid] = None
 
     def list(self):
         ls = set(self.parent.keys())

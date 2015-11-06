@@ -154,9 +154,6 @@ class PeerClient(Process):
                 ret = self._get_peer_sock(addr)
         else:
             ret = self.peers_sock[addr]
-        sock_status = self.parent.sock_status
-        sock_status[addr] = True if ret else False
-        self.parent.sock_status = sock_status
         return ret
 
     def _lookup(self, name):
@@ -312,9 +309,6 @@ class PeerClient(Process):
                 peer_action = dict(type='exit', id=peer_id)
                 exch.pkl_send(peer_action)
                 sock.close()
-                sock_status = self.parent.sock_status
-                sock_status[peer_id] = False
-                self.parent.sock_status = sock_status
 
     def do(self, action, args):
         """
