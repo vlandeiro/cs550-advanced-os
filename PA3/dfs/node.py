@@ -44,14 +44,12 @@ class Node:
         # create shared dictionary to store the local paths to the registered files
         self.manager = Manager()
         self.local_files = self.manager.dict()
-        self.peers_sock = self.manager.dict()
-        self.peers_check = self.manager.dict()
+        self.sock_status = self.manager.dict()
 
         # configuration when the indexing server is distributed
         if self.idx_type == 'distributed':
             self.nodes_list = config['nodes']
             self.nodes_count = len(self.nodes_list)
-            self.check_timeout = 5
             self.replica = config['replica']
             # get this server info from config file
             if self.ip not in self.nodes_list:

@@ -45,6 +45,10 @@ class PeerClient(Process):
         self.idx_server_sock = None
         self.idx_server_proxy = None
 
+        self.peers_sock = {}
+        self.peers_check = {}
+        self.check_timeout = 5
+
         self.actions = {
             'exit': self._exit,
             'lookup': self._lookup,
@@ -123,37 +127,36 @@ class PeerClient(Process):
 
     def _get_peer_sock(self, peer_id):
         addr, port = peer_id.split(':')
-        peers_sock = self.parent.peers_sock
-        peers_check = self.parent.peers_check
         self.logger.debug(addr)
-        self.logger.debug(peers_sock.keys())
+        self.logger.debug(self.peers_sock.keys())
         ret = False
-        if addr not in peers_sock.keys() or peers_sock[addr] is None:
+        if addr not in self.peers_sock.keys() or self.peers_sock[addr] is None:
             # connection to peer
             try:
                 port = int(port)
                 conn_param = (addr, port)
                 self.logger.debug('Connect to: %s', repr(conn_param))
                 peer_sock = socket(AF_INET, SOCK_STREAM)
-                peers_sock[addr] = peer_sock
-                peers_check[addr] = time.time()
+                self.peers_sock[addr] = peer_sock
+                self.peers_check[addr] = time.time()
                 peer_sock.connect(conn_param)
-                ret = peers_sock[addr]
+                ret = self.peers_sock[addr]
             except error as e: # peer unreachable
                 if e.errno == errno.ECONNREFUSED:
-                    peers_sock[addr] = False
-                    peers_check[addr] = time.time()
+                    self.peers_sock[addr] = False
+                    self.peers_check[addr] = time.time()
                     ret = False
-        elif peers_sock[addr] is False:
+        elif self.peers_sock[addr] is False:
             # check if last status change was more than n seconds ago
             # try to reconnect if timeout has expired
-            if time.time()-peers_check[addr] > self.parent.check_timeout:
-                peers_sock[addr] = None
+            if time.time()-self.peers_check[addr] > self.parent.check_timeout:
+                self.peers_sock[addr] = None
                 ret = self._get_peer_sock(addr)
         else:
-            ret = peers_sock[addr]
-        self.parent.peers_sock = peers_sock
-        self.parent.peers_check = peers_check
+            ret = self.peers_sock[addr]
+        sock_status = self.parent.sock_status
+        sock_status[addr] = True if ret else False
+        self.parent.sock_status = sock_status
         return ret
 
     def _lookup(self, name):
@@ -304,13 +307,15 @@ class PeerClient(Process):
         """
         self.idx_server_proxy.close_connection(self.id)
         peers_sock = self.parent.peers_sock
-        for peer_id in peers_sock.keys():
-            sock = peers_sock[peer_id]
+        for peer_id, sock in self.peers_sock.iteritems():
             if sock:
                 exch = MessageExchanger(sock)
-                peer_action = dict(type='exit')
+                peer_action = dict(type='exit', id=peer_id)
                 exch.pkl_send(peer_action)
                 sock.close()
+                sock_status = self.parent.sock_status
+                sock_status[peers_sock] = False
+                self.parent.sock_status = sock_status
 
     def do(self, action, args):
         """
