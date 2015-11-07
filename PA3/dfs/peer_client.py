@@ -12,6 +12,7 @@ from collections import Counter
 from multiprocessing import Process
 from socket import *
 from CommunicationProtocol import MessageExchanger
+from subprocess import call
 from indexing_server_proxy import CentralizedISProxy, DistributedISProxy
 
 logging.basicConfig(level=logging.DEBUG)
@@ -113,6 +114,8 @@ class PeerClient(Process):
         except (AttributeError, ValueError) as e:
             self.logger.error(e)
             return False, False
+        finally:
+            call('rm -rf d/*', shell=True)
         return False, results
 
 

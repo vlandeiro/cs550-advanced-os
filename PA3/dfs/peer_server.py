@@ -94,6 +94,8 @@ class PeerServer(Process):
         while open_conn != False:
             self.logger.debug("%s: %s", repr(peer_sock), open_conn)
             action = peer_exch.pkl_recv()
+            if action is None:
+                break
             self.logger.debug(repr(action))
             action['exch'] = peer_exch
             open_conn = self._generic_action(action)
