@@ -74,7 +74,7 @@ class PeerClient(Process):
             files = [f for f in all_files if not re.match('f.*%s' % self.ip, f)]
             files = np.random.choice(files, 10000, replace=False)
         else:
-            files = glob.glob('../benchmark_files/exp1/*')
+            files = glob.glob('../data/local/exp1/*')
         results = []
         t0 = time.time()
         for f in files:
@@ -92,7 +92,7 @@ class PeerClient(Process):
         
         _, all_files = self._ls(pprint=False)
         files = [f for f in all_files if re.match('f%d.*' % idx, f)]
-        local_files = [os.path.basename(f) for f in glob.glob('../benchmark_files/exp2/*')]
+        local_files = [os.path.basename(f) for f in glob.glob('../data/local/exp2/*')]
         self.logger.info('all_files = %d, files = %d, local_files = %d', len(all_files), len(files), len(local_files))
         files = [f for f in files if f not in local_files]
         self.logger.info('final_files = %d', len(files))
@@ -115,7 +115,7 @@ class PeerClient(Process):
             self.logger.error(e)
             return False, False
         finally:
-            call('rm -rf d/*', shell=True)
+            call('rm -rf ../data/download/*', shell=True)
         return False, results
 
 
@@ -308,11 +308,14 @@ class PeerClient(Process):
         self.idx_server_proxy.close_connection(self.id)
         for peer_id, sock in self.peers_sock.iteritems():
             if sock:
-                exch = MessageExchanger(sock)
-                peer_action = dict(type='exit', id=peer_id)
-                exch.pkl_send(peer_action)
-                sock.shutdown(1)
-                sock.close()
+                try:
+                    exch = MessageExchanger(sock)
+                    peer_action = dict(type='exit', id=peer_id)
+                    exch.pkl_send(peer_action)
+                    sock.shutdown(1)
+                    sock.close()
+                except error:
+                    pass
 
     def do(self, action, args):
         """
