@@ -4,13 +4,14 @@ import json
 from subprocess import call
 
 log_level = 'INFO'
+download_dir = '../data/download/'
 
 default_distributed = {
     'idx_type': 'distributed',
     'log_level': log_level,
     'replica': 0,
     'max_connections': 20,
-    'download_dir': './d/',
+    'download_dir': download_dir,
     'timeout_value': 0.2,
     'file_server_port': 4000,
     'idx_server_port': 5000
@@ -21,7 +22,7 @@ default_centralized_peer = {
     'file_server_port': 4000,
     'idx_server_ip': None,
     'idx_server_port': 5000,
-    'download_dir': './d/',
+    'download_dir': download_dir,
     'log_level': log_level,
     'max_connections': 20,
     'timeout_value': 0.2
