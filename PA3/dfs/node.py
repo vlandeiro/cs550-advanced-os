@@ -41,7 +41,7 @@ class Node:
         level = logging.getLevelName(self.log_level)
         self.logger.setLevel(level)
 
-        # create shared dictionary to store the local paths to the registered files
+            # create shared dictionary to store the local paths to the registered files
         self.manager = Manager()
         self.local_files = self.manager.dict()
 
