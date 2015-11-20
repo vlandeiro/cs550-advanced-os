@@ -16,3 +16,4 @@ def gen_workload(count):
     # is very unlikely!
     while len(key_vals) < count:
         key_vals[gen_rand_string(10)] = gen_rand_string(90)
+    return key_vals
