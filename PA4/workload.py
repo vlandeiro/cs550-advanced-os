@@ -10,7 +10,7 @@ l = len(charset_list)
 def gen_rand_string(size):
     return "".join([charset_list[int(random.random()*l)] for _ in range(size)])
 
-def gen_key_value(count):
+def gen_workload(count):
     key_vals = {gen_rand_string(10): gen_rand_string(90) for _ in range(count)}
     # loop will be true when the same random key has been generated twice: that
     # is very unlikely!
