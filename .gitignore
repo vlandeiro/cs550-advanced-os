@@ -56,3 +56,10 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# AWS
+credentials.csv
+advanced_os.pem
+
+# CS550
+PA*.pdf
