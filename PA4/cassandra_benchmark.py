@@ -1,3 +1,4 @@
+#!/usr/bin/python
 from workload import *
 from cassandra.cluster import Cluster
 import sys
