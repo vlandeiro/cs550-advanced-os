@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS data (key varchar, val varchar, PRIMARY KEY (key));
 """
 
 def benchmark_function(actions, f_name, workload):
-    t0 = time.clock()
     method = actions[f_name]
+    t0 = time.clock()
     if f_name in ['get', 'del']:
         for k, v in workload.items():
             method(k)

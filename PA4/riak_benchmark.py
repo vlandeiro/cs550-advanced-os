@@ -9,8 +9,8 @@ rc = RiakClient(protocol='pbc', host='127.0.0.1', pb_port=8087)
 bucket = rc.bucket('benchmark')
 
 def benchmark_function(actions, f_name, workload):
-    t0 = time.clock()
     method = actions[f_name]
+    t0 = time.clock()
     if f_name in ['get', 'del']:
         for k, v in workload.items():
             method(k)

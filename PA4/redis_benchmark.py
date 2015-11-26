@@ -8,8 +8,8 @@ startup_nodes = [{'host': '127.0.0.1', 'port':'30001'}]
 rc = StrictRedisCluster(startup_nodes=startup_nodes, decode_responses=True)
 
 def benchmark_function(actions, f_name, workload):
-    t0 = time.clock()
     method = actions[f_name]
+    t0 = time.clock()
     if f_name in ['get', 'del']:
         for k, v in workload.items():
             method(k)
