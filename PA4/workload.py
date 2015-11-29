@@ -1,6 +1,7 @@
 import random
 import string
 import pycurl as pc
+import cStringIO
 
 KEYSIZE = 10
 VALUESIZE = 90
@@ -10,9 +11,13 @@ charset_list = list(string.ascii_lowercase + string.ascii_uppercase + string.dig
 l = len(charset_list)
 
 def get_private_ip():
+    response = cStringIO.StringIO()
     c = pc.Curl()
     c.setopt(pc.URL, "http://169.254.169.254/latest/meta-data/hostname")
-    return c.perform()
+    c.setopt(c.WRITEFUNCTION, response.write)
+    c.perform()
+    c.close()
+    return response
 
 def gen_rand_string(size):
     return "".join([charset_list[int(random.random()*l)] for _ in range(size)])
