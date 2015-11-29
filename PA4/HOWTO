@@ -1,0 +1,38 @@
+# Launch Redis
+
+- On every node, run:
+
+redis-server ./redis.conf
+
+- On one node only, run:
+
+redis-trib.rb create --replicas 0 ip0:7000 ip1:7000 etc
+
+# Launch Cassandra
+
+- Stop cassandra if it is running:
+
+sudo service cassandra stop
+
+- Clear the data:
+
+sudo rm -rf /var/lib/cassandra/data/system/*
+
+- Change seeds in /etc/cassandra/conf/cassandra.yaml file:
+
+from seeds: "127.0.0.1" to seeds: "ip0,ip1"
+
+- Start the cluster
+
+sudo service cassandra start
+
+# Launch Riak
+
+- On th
+- Add actual hostname to riak erlang local config
+
+sed -i "s/127.0.0.1/`hostname -i`/" /etc/riak/vm.args
+
+- Bind the various riak services to all IPs in the riak app config
+
+sed -i "s/127.0.0.1/0.0.0.0/" /etc/riak/app.config
