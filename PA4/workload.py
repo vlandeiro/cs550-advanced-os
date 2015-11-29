@@ -11,14 +11,15 @@ l = len(charset_list)
 
 def get_private_ip():
     c = pc.Curl()
-    c.setopt(URL, "http://169.254.169.254/latest/meta-data/hostname")
+    c.setopt(pc.URL, "http://169.254.169.254/latest/meta-data/hostname")
     return c.perform()
 
 def gen_rand_string(size):
     return "".join([charset_list[int(random.random()*l)] for _ in range(size)])
 
 def gen_workload(count):
-    random.seed(SEED + get_private_ip()) # same workload is generated every time
+    # same workload is generated every time for a given instance
+    random.seed(SEED_BASE + get_private_ip())
     key_vals = {gen_rand_string(10): gen_rand_string(90) for _ in range(count)}
     # loop will be true when the same random key has been generated twice: that
     # is very unlikely!
