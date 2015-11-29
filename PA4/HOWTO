@@ -1,8 +1,8 @@
 # Launch Redis
 
-- On every node, run:
+- On every node, run the redis server in background:
 
-redis-server ./redis.conf
+redis-server ./redis.conf > log_redis 2>&1
 
 - On one node only, run:
 
@@ -28,7 +28,6 @@ sudo service cassandra start
 
 # Launch Riak
 
-- On th
 - Add actual hostname to riak erlang local config
 
 sed -i "s/127.0.0.1/`hostname -i`/" /etc/riak/vm.args
@@ -36,3 +35,20 @@ sed -i "s/127.0.0.1/`hostname -i`/" /etc/riak/vm.args
 - Bind the various riak services to all IPs in the riak app config
 
 sed -i "s/127.0.0.1/0.0.0.0/" /etc/riak/app.config
+
+- Start all the nodes:
+
+sudo riak start
+
+- On all nodes but the first, join first node:
+
+sudo riak-admin cluster join riak@ip0
+
+- Run on first node:
+
+sudo riak-admin cluster plan
+
+- If plan is okay, run:
+
+sudo riak-admin cluster commit
+
