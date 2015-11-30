@@ -19,7 +19,7 @@ def benchmark_function(actions, f_name, workload):
             method(k, v)
     t1 = time.clock()
     delta = t1-t0
-    print("Redis %s benchmark finished in %.3fs." % (f_name, delta))
+    print("Riak %s benchmark finished in %.3fs." % (f_name, delta))
 
 def benchmark(size):
     workload = gen_workload(size)
