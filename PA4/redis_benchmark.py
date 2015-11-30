@@ -33,4 +33,4 @@ def benchmark(size):
     benchmark_function(actions, 'del', workload)
 
 if __name__ == '__main__':
-    benchmark(10000)
+    benchmark(30000)
