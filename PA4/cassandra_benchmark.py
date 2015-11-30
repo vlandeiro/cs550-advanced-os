@@ -4,7 +4,9 @@ from cassandra.cluster import Cluster
 import sys
 import time
 
-cluster = Cluster()
+cluster = Cluster(["52.34.202.65",
+                   "52.34.207.158",
+                   "52.34.201.144"])
 session = cluster.connect()
 
 create_keyspace_cmd = """
@@ -60,4 +62,4 @@ def benchmark(size):
     cluster.shutdown()
 
 if __name__ == '__main__':
-    benchmark(1000)
+    benchmark(30000)
