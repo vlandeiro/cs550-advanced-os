@@ -24,7 +24,7 @@ sudo rm -rf /var/lib/cassandra/*
 
 - Change seeds in /etc/cassandra/conf/cassandra.yaml file:
 
-sudo sed -i "s/127.0.0.1/ip0,ip1/" /etc/cassandra/conf/cassandra.yaml
+sudo sed -i "s/52.34.87.139,52.24.115.114/52.34.87.139,52.24.115.114,52.34.26.27,52.27.243.180,52.34.128.28,52.34.130.97,52.34.9.193,52.33.187.183,52.34.67.150,52.34.120.105,52.34.93.51,52.34.5.90,52.34.52.205,52.34.128.186,52.11.49.152/" /etc/cassandra/conf/cassandra.yaml
 
 - Change the broadcast rpc address:
 

@@ -32,7 +32,9 @@ if __name__ == '__main__':
     list_hosts = " ".join([username + "@" + ip for ip in instances])
     print("aws %s" % (list_hosts))
     print("Cassandra seeds:")
-    print('"%s"' % ",".join(instances[:2]))
+    print('"%s"' % ",".join(instances[:15]))
+    print("Cassandra contact points:")
+    print(','.join(['"%s"' % ip for ip in instances]))
     print("Redis create command:")
     cmd_base = "redis-trib.rb create --replicas 0 %s"
     list_hosts = " ".join([ip + ":7000" for ip in instances])
