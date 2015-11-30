@@ -27,10 +27,16 @@ if __name__ == '__main__':
     conn, instances = get_running_instances(access_id, secret_key)
     count = 0
     username = 'ec2-user'
-    for node_count in [1,2,4,8,16]:
-        list_hosts = " ".join([username + "@" + ip for ip in instances[:node_count]])
-        print("clus%d %s" % (node_count, list_hosts))
-    sys.stderr.write("Copy the output to /etc/clusters to work with clusterssh.\n")
+    # create file for clusterssh
+    print("Copy the output to /etc/clusters to work with clusterssh:")
+    list_hosts = " ".join([username + "@" + ip for ip in instances])
+    print("aws %s" % (list_hosts))
+    print("Cassandra seeds:")
+    print('"%s"' % ",".join(instances[:2]))
+    print("Redis create command:")
+    cmd_base = "redis-trib.rb create --replicas 0 %s"
+    list_hosts = " ".join([ip + ":7000" for ip in instances])
+    print(cmd_base % list_hosts)
     # for j, inst in enumerate(instances):
     #     print("\t%s\tnode%d" % (inst, j))
     conn.close()
