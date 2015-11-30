@@ -2,11 +2,15 @@
 
 - On every node, run the redis server in background:
 
-redis-server ./redis.conf > log_redis 2>&1
+redis-server ./redis.conf > log_redis 2>&1 &
 
 - On one node only, run:
 
 redis-trib.rb create --replicas 0 ip0:7000 ip1:7000 etc
+
+- To kill the servers after benchmarks:
+
+ps axf | grep redis-server | grep -v grep | awk '{print "kill -9 " $1}' | sh
 
 # Launch Cassandra
 
@@ -16,29 +20,39 @@ sudo service cassandra stop
 
 - Clear the data:
 
-sudo rm -rf /var/lib/cassandra/data/system/*
+sudo rm -rf /var/lib/cassandra/*
 
 - Change seeds in /etc/cassandra/conf/cassandra.yaml file:
 
-from seeds: "127.0.0.1" to seeds: "ip0,ip1"
+sudo sed -i "s/127.0.0.1/ip0,ip1/" /etc/cassandra/conf/cassandra.yaml
+
+- Change the broadcast rpc address:
+
+sudo sed -i "s/1.2.3.4/`hostname -i`/" /etc/cassandra/conf/cassandra.yaml
 
 - Start the cluster
 
 sudo service cassandra start
 
+- Change the contact points in the benchmark file.
+
 # Launch Riak
 
 - Add actual hostname to riak erlang local config
 
-sed -i "s/127.0.0.1/`hostname -i`/" /etc/riak/vm.args
+sudo sed -i "s/127.0.0.1/`hostname -i`/" /etc/riak/vm.args
 
 - Bind the various riak services to all IPs in the riak app config
 
-sed -i "s/127.0.0.1/0.0.0.0/" /etc/riak/app.config
+sudo sed -i "s/127.0.0.1/0.0.0.0/" /etc/riak/app.config
 
 - Start all the nodes:
 
 sudo riak start
+
+- If start does not work, clean ring:
+
+sudo rm -rf /var/lib/riak/ring/*
 
 - On all nodes but the first, join first node:
 
@@ -51,4 +65,3 @@ sudo riak-admin cluster plan
 - If plan is okay, run:
 
 sudo riak-admin cluster commit
-

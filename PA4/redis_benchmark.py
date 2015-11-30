@@ -4,7 +4,7 @@ from rediscluster import StrictRedisCluster
 import sys
 import time
 
-startup_nodes = [{'host': '127.0.0.1', 'port':'30001'}]
+startup_nodes = [{'host': '127.0.0.1', 'port':'7000'}]
 rc = StrictRedisCluster(startup_nodes=startup_nodes, decode_responses=True)
 
 def benchmark_function(actions, f_name, workload):
