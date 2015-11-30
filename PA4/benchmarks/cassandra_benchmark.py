@@ -4,9 +4,7 @@ from cassandra.cluster import Cluster
 import sys
 import time
 
-cluster = Cluster(["52.34.202.65",
-                   "52.34.207.158",
-                   "52.34.201.144"])
+cluster = Cluster(["127.0.0.1"])
 session = cluster.connect()
 
 create_keyspace_cmd = """
@@ -20,14 +18,14 @@ CREATE TABLE IF NOT EXISTS data (key varchar, val varchar, PRIMARY KEY (key));
 
 def benchmark_function(actions, f_name, workload):
     method = actions[f_name]
-    t0 = time.clock()
+    t0 = time.time()
     if f_name in ['get', 'del']:
         for k, v in workload.items():
             method(k)
     else:
         for k, v in workload.items():
             method(k, v)
-    t1 = time.clock()
+    t1 = time.time()
     delta = t1-t0
     print("Cassandra %s benchmark finished in %.3fs." % (f_name, delta))
 
